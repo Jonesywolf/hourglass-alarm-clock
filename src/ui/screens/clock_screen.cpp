@@ -7,6 +7,7 @@ static lv_obj_t *clock_label;
 static lv_obj_t *meridiem_label;
 static lv_obj_t *wifi_label;
 static lv_obj_t *alarm_label;
+static const lv_coord_t clock_meridiem_gap = 4;
 static hg_wifi_bars_t displayed_wifi_bars = HG_WIFI_BARS_NONE;
 static hg_wifi_bars_t pending_wifi_bars = HG_WIFI_BARS_NONE;
 static uint8_t pending_wifi_samples = 0;
@@ -41,7 +42,7 @@ static void hg_clock_set_wifi_icon(hg_wifi_bars_t bars, bool force) {
     lv_label_set_text(wifi_label, wifi_icon_glyphs[clamped_bars]);
 }
 
-static void hg_clock_update_meridiem_position(void) {
+static void hg_clock_update_meridiem_position(bool is_pm) {
     if (!clock_label || !meridiem_label) {
         return;
     }
@@ -52,11 +53,14 @@ static void hg_clock_update_meridiem_position(void) {
     }
 
     lv_coord_t clock_w = lv_obj_get_width(clock_label);
+    lv_coord_t meridiem_w = lv_obj_get_width(meridiem_label);
     lv_coord_t meridiem_y = lv_obj_get_y(clock_label);
-    if (lv_label_get_text(meridiem_label)[0] == 'P') {
+    if (is_pm) {
         meridiem_y += lv_obj_get_height(clock_label) - lv_obj_get_height(meridiem_label);
     }
-    lv_obj_set_pos(meridiem_label, lv_obj_get_x(clock_label) + clock_w + 4, meridiem_y);
+    lv_obj_align(clock_label, LV_ALIGN_CENTER, -(meridiem_w + clock_meridiem_gap) / 2, 0);
+    lv_obj_set_pos(meridiem_label, lv_obj_get_x(clock_label) + clock_w + clock_meridiem_gap,
+                   meridiem_y);
 }
 
 void hg_clock_screen_create(lv_obj_t *parent) {
@@ -82,7 +86,7 @@ void hg_clock_screen_create(lv_obj_t *parent) {
     lv_obj_set_style_text_font(meridiem_label, HG_FONT_STATUS, 0);
     lv_obj_set_style_text_color(meridiem_label, hg_theme_fg(), 0);
     lv_label_set_text(meridiem_label, "AM");
-    hg_clock_update_meridiem_position();
+    hg_clock_update_meridiem_position(false);
 
     alarm_label = lv_label_create(parent);
     lv_obj_set_style_text_font(alarm_label, HG_FONT_ALARM, 0);
@@ -116,7 +120,7 @@ void hg_clock_screen_update(const hg_clock_snapshot_t *snap) {
     if (!snap->time.valid) {
         lv_label_set_text(clock_label, "--:--");
         lv_label_set_text(meridiem_label, "--");
-        hg_clock_update_meridiem_position();
+        hg_clock_update_meridiem_position(false);
         lv_obj_set_style_text_color(wifi_label, hg_theme_muted(), 0);
         pending_wifi_bars = HG_WIFI_BARS_NONE;
         pending_wifi_samples = 0;
@@ -131,8 +135,9 @@ void hg_clock_screen_update(const hg_clock_snapshot_t *snap) {
     }
     lv_snprintf(time_str, sizeof(time_str), "%d:%02d", hour12, snap->time.minute);
     lv_label_set_text(clock_label, time_str);
-    lv_label_set_text(meridiem_label, (snap->time.hour_24 >= 12) ? "PM" : "AM");
-    hg_clock_update_meridiem_position();
+    bool is_pm = snap->time.hour_24 >= 12;
+    lv_label_set_text(meridiem_label, is_pm ? "PM" : "AM");
+    hg_clock_update_meridiem_position(is_pm);
 
     lv_obj_set_style_text_color(
         wifi_label,
