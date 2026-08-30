@@ -21,3 +21,7 @@ lv_color_t hg_theme_bg(void) {
 lv_color_t hg_theme_muted(void) {
     return nightlight ? lv_color_hex(0x7A2020) : lv_color_hex(0x666666);
 }
+
+lv_color_t hg_theme_alarm(void) {
+    return nightlight ? lv_color_hex(0x7A2020) : lv_color_hex(0xB0B0B0);
+}

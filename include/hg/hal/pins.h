@@ -15,9 +15,9 @@
 
 #define HG_PIN_TOUCH      (-1)
 
-#define HG_PIN_ENC_A      (-1)
-#define HG_PIN_ENC_B      (-1)
-#define HG_PIN_ENC_BTN    (-1)
+#define HG_PIN_ENC_A         1   /* Hardware interrupt capable */
+#define HG_PIN_ENC_B         2   /* Hardware interrupt capable */
+#define HG_PIN_ENC_BTN       3   /* Active LOW with pullup */
 
 /* MAX98357A-class I2S amp (board may be marked MAX93857A). */
 #define HG_PIN_I2S_BCLK   (-1)

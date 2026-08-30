@@ -6,6 +6,7 @@
 static lv_obj_t *clock_label;
 static lv_obj_t *meridiem_label;
 static lv_obj_t *wifi_label;
+static lv_obj_t *alarm_label;
 static hg_wifi_bars_t displayed_wifi_bars = HG_WIFI_BARS_NONE;
 static hg_wifi_bars_t pending_wifi_bars = HG_WIFI_BARS_NONE;
 static uint8_t pending_wifi_samples = 0;
@@ -78,12 +79,35 @@ void hg_clock_screen_create(lv_obj_t *parent) {
     lv_obj_set_style_text_color(meridiem_label, hg_theme_fg(), 0);
     lv_label_set_text(meridiem_label, "AM");
     hg_clock_update_meridiem_position();
+
+    alarm_label = lv_label_create(parent);
+    lv_obj_set_style_text_font(alarm_label, HG_FONT_ALARM, 0);
+    lv_obj_set_style_text_color(alarm_label, hg_theme_alarm(), 0);
+    lv_label_set_text(alarm_label, "--:--");
+    lv_obj_align(alarm_label, LV_ALIGN_BOTTOM_LEFT, 10, -10);
+}
+
+void hg_clock_screen_update_alarm(const hg_alarm_snapshot_t *alarm) {
+    if (!alarm || !alarm_label) {
+        return;
+    }
+
+    char alarm_str[16];
+    int alarm_hour12 = alarm->hour % 12;
+    if (alarm_hour12 == 0) {
+        alarm_hour12 = 12;
+    }
+    lv_snprintf(alarm_str, sizeof(alarm_str), "%d:%02d%s", alarm_hour12, alarm->minute,
+                (alarm->hour >= 12) ? "pm" : "am");
+    lv_label_set_text(alarm_label, alarm_str);
 }
 
 void hg_clock_screen_update(const hg_clock_snapshot_t *snap) {
     if (!snap || !clock_label) {
         return;
     }
+
+    hg_clock_screen_update_alarm(&snap->alarm);
 
     if (!snap->time.valid) {
         lv_label_set_text(clock_label, "--:--");

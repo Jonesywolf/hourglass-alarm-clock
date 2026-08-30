@@ -12,6 +12,7 @@ LV_FONT_DECLARE(inter_96);
 
 #define HG_FONT_CLOCK   (&inter_96)
 #define HG_FONT_STATUS  (&lv_font_montserrat_14)
+#define HG_FONT_ALARM   (&lv_font_montserrat_28)
 #define HG_FONT_WIFI_ICON  (&icons_72)
 #define HG_FONT_WIFI_ICON_SMALL  (&icons_14)
 

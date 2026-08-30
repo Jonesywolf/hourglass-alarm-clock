@@ -39,8 +39,15 @@ typedef struct {
 } hg_wifi_snapshot_t;
 
 typedef struct {
+    bool enabled;
+    int hour;
+    int minute;
+} hg_alarm_snapshot_t;
+
+typedef struct {
     hg_time_snapshot_t time;
     hg_wifi_snapshot_t wifi;
+    hg_alarm_snapshot_t alarm;
 } hg_clock_snapshot_t;
 
 typedef struct {
@@ -57,11 +64,5 @@ typedef struct {
     int weather_code;
     int aqi;
 } hg_weather_snapshot_t;
-
-typedef struct {
-    bool enabled;
-    int hour;
-    int minute;
-} hg_alarm_snapshot_t;
 
 #endif

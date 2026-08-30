@@ -31,6 +31,7 @@ static void hg_app_push_clock(void) {
     hg_clock_snapshot_t snap;
     hg_time_get_snapshot(&snap.time);
     hg_wifi_get_snapshot(&snap.wifi);
+    hg_alarm_get_snapshot(&snap.alarm);
     hg_clock_screen_update(&snap);
 }
 
