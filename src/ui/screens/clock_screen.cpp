@@ -52,7 +52,11 @@ static void hg_clock_update_meridiem_position(void) {
     }
 
     lv_coord_t clock_w = lv_obj_get_width(clock_label);
-    lv_obj_set_pos(meridiem_label, lv_obj_get_x(clock_label) + clock_w + 4, lv_obj_get_y(clock_label));
+    lv_coord_t meridiem_y = lv_obj_get_y(clock_label);
+    if (lv_label_get_text(meridiem_label)[0] == 'P') {
+        meridiem_y += lv_obj_get_height(clock_label) - lv_obj_get_height(meridiem_label);
+    }
+    lv_obj_set_pos(meridiem_label, lv_obj_get_x(clock_label) + clock_w + 4, meridiem_y);
 }
 
 void hg_clock_screen_create(lv_obj_t *parent) {
