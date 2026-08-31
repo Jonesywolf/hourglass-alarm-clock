@@ -92,11 +92,19 @@ void hg_clock_screen_create(lv_obj_t *parent) {
     lv_obj_set_style_text_font(alarm_label, HG_FONT_ALARM, 0);
     lv_obj_set_style_text_color(alarm_label, hg_theme_alarm(), 0);
     lv_label_set_text(alarm_label, "--:--");
+    lv_obj_add_flag(alarm_label, LV_OBJ_FLAG_HIDDEN);
     lv_obj_align(alarm_label, LV_ALIGN_BOTTOM_LEFT, 10, -10);
 }
 
 void hg_clock_screen_update_alarm(const hg_alarm_snapshot_t *alarm) {
     if (!alarm || !alarm_label) {
+        return;
+    }
+
+    if (alarm->enabled) {
+        lv_obj_clear_flag(alarm_label, LV_OBJ_FLAG_HIDDEN);
+    } else {
+        lv_obj_add_flag(alarm_label, LV_OBJ_FLAG_HIDDEN);
         return;
     }
 

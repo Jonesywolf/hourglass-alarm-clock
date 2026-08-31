@@ -13,6 +13,9 @@ static void hg_input_router_apply_encoder(int32_t delta) {
 
     hg_alarm_snapshot_t alarm;
     hg_alarm_get_snapshot(&alarm);
+    if (!alarm.enabled) {
+        return;
+    }
 
     int total_minutes = alarm.hour * 60 + alarm.minute + (int)delta;
     total_minutes %= (24 * 60);
@@ -36,6 +39,14 @@ void hg_input_router_update(void) {
     hg_touch_update();
     hg_encoder_update();
     (void)hg_touch_is_pressed();
+
+    if (hg_encoder_button_pressed()) {
+        hg_alarm_snapshot_t alarm;
+        hg_alarm_get_snapshot(&alarm);
+        hg_alarm_set_enabled(!alarm.enabled);
+        hg_alarm_get_snapshot(&alarm);
+        hg_clock_screen_update_alarm(&alarm);
+    }
+
     hg_input_router_apply_encoder(hg_encoder_take_delta());
-    (void)hg_encoder_button_pressed();
 }
