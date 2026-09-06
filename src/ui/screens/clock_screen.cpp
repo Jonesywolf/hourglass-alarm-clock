@@ -79,7 +79,8 @@ void hg_clock_screen_create(lv_obj_t *parent) {
     clock_label = lv_label_create(parent);
     lv_obj_set_style_text_font(clock_label, HG_FONT_CLOCK, 0);
     lv_obj_set_style_text_color(clock_label, hg_theme_fg(), 0);
-    lv_label_set_text(clock_label, "--:--");
+    /* inter_96 only has glyphs 0-9 and ':' (range 48-58); no '-' placeholder glyph. */
+    lv_label_set_text(clock_label, "");
     lv_obj_align(clock_label, LV_ALIGN_CENTER, 0, 0);
 
     meridiem_label = lv_label_create(parent);
@@ -100,6 +101,8 @@ void hg_clock_screen_update_alarm(const hg_alarm_snapshot_t *alarm) {
     if (!alarm || !alarm_label) {
         return;
     }
+
+    lv_obj_set_style_text_color(alarm_label, hg_theme_alarm(), 0);
 
     if (alarm->enabled) {
         lv_obj_clear_flag(alarm_label, LV_OBJ_FLAG_HIDDEN);
@@ -123,10 +126,23 @@ void hg_clock_screen_update(const hg_clock_snapshot_t *snap) {
         return;
     }
 
+    if (!snap->display_active) {
+        lv_obj_add_flag(clock_label, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_add_flag(meridiem_label, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_add_flag(wifi_label, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_add_flag(alarm_label, LV_OBJ_FLAG_HIDDEN);
+        return;
+    }
+    lv_obj_clear_flag(clock_label, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_clear_flag(meridiem_label, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_clear_flag(wifi_label, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_set_style_text_color(clock_label, hg_theme_fg(), 0);
+    lv_obj_set_style_text_color(meridiem_label, hg_theme_fg(), 0);
+
     hg_clock_screen_update_alarm(&snap->alarm);
 
     if (!snap->time.valid) {
-        lv_label_set_text(clock_label, "--:--");
+        lv_label_set_text(clock_label, "");
         lv_label_set_text(meridiem_label, "--");
         hg_clock_update_meridiem_position(false);
         lv_obj_set_style_text_color(wifi_label, hg_theme_muted(), 0);

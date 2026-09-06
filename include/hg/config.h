@@ -20,4 +20,11 @@
 
 #define HG_TIME_QUERY_TIMEOUT_MS 10U
 
+/* Lux hysteresis band: <= DARK enters low-light, >= BRIGHT returns to normal, in between holds. */
+#define HG_DISPLAY_DARK_LUX 5.0f
+#define HG_DISPLAY_BRIGHT_LUX 50.0f
+
+#define HG_DISPLAY_RED_TO_OFF_MIN 60
+#define HG_DISPLAY_PRE_ALARM_MIN 60
+
 #endif

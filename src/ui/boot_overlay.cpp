@@ -123,13 +123,16 @@ void hg_boot_overlay_update(
 
     if (overlay) {
         lv_obj_move_foreground(overlay);
+        lv_obj_set_style_bg_color(overlay, hg_theme_bg(), 0);
     }
 
     if (icon_label) {
         hg_boot_overlay_set_icon_frame();
+        lv_obj_set_style_text_color(icon_label, hg_theme_fg(), 0);
     }
 
     if (status_label) {
+        lv_obj_set_style_text_color(status_label, hg_theme_fg(), 0);
         if (!wifi_ready) {
             hg_boot_overlay_set_status_connecting(ssid);
         } else {

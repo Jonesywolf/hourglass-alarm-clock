@@ -11,6 +11,7 @@
 #include "hg/hal/speaker.h"
 #include "hg/services/alarm.h"
 #include "hg/services/brightness.h"
+#include "hg/services/display_mode.h"
 #include "hg/services/indoor_air.h"
 #include "hg/services/phone_bridge.h"
 #include "hg/services/store.h"
@@ -32,6 +33,7 @@ static void hg_app_push_clock(void) {
     hg_time_get_snapshot(&snap.time);
     hg_wifi_get_snapshot(&snap.wifi);
     hg_alarm_get_snapshot(&snap.alarm);
+    snap.display_active = hg_display_mode_get() != HG_DISPLAY_MODE_OFF;
     hg_clock_screen_update(&snap);
 }
 
@@ -50,6 +52,7 @@ void hg_app_setup(void) {
     hg_indoor_air_init();
     hg_alarm_init();
     hg_brightness_init();
+    hg_display_mode_init();
     hg_phone_bridge_init();
 
     hg_speaker_init();
@@ -60,6 +63,10 @@ void hg_app_setup(void) {
     hg_boot_overlay_create();
     hg_wifi_get_snapshot(&wifi_snap);
     hg_time_get_snapshot(&time_snap);
+    /* Establish the correct theme before the overlay's first paint, or it flashes white. */
+    hg_brightness_update();
+    hg_display_mode_update();
+    hg_theme_set_nightlight(hg_display_mode_get() != HG_DISPLAY_MODE_NORMAL);
     hg_boot_overlay_update(&wifi_snap, &time_snap, hg_wifi_get_target_ssid());
     hg_overlays_init();
     hg_input_router_init();
@@ -82,7 +89,15 @@ void hg_app_loop(void) {
             hg_wifi_update();
             hg_wifi_get_snapshot(&wifi_snap);
             hg_time_get_snapshot(&time_snap);
+            hg_brightness_update();
+            hg_display_mode_update();
+            hg_theme_set_nightlight(hg_display_mode_get() != HG_DISPLAY_MODE_NORMAL);
             hg_boot_overlay_update(&wifi_snap, &time_snap, hg_wifi_get_target_ssid());
+
+            /* Push real values immediately so the clock never shows stale placeholder text. */
+            if (!hg_boot_overlay_is_active()) {
+                hg_app_push_clock();
+            }
         }
 
         delay(HG_LVGL_IDLE_DELAY_MS);
@@ -111,6 +126,8 @@ void hg_app_loop(void) {
         hg_indoor_air_update();
         hg_alarm_update();
         hg_brightness_update();
+        hg_display_mode_update();
+        hg_theme_set_nightlight(hg_display_mode_get() != HG_DISPLAY_MODE_NORMAL);
         hg_phone_bridge_update();
         hg_overlays_update();
         hg_app_push_clock();

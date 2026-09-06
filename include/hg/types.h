@@ -48,6 +48,7 @@ typedef struct {
     hg_time_snapshot_t time;
     hg_wifi_snapshot_t wifi;
     hg_alarm_snapshot_t alarm;
+    bool display_active;
 } hg_clock_snapshot_t;
 
 typedef struct {
