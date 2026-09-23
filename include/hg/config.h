@@ -16,9 +16,20 @@
 #define HG_UI_TICK_MS 1000U
 #define HG_LVGL_IDLE_DELAY_MS 5
 
+/* 1 = tagged Serial logs via HG_LOG / HG_LOG_TASK. 0 on device; Serial stalls frames. */
+#define HG_LOG_DEBUG 1
+
 #define HG_ALARM_STORE_DEBOUNCE_MS 800U
 
 #define HG_TIME_QUERY_TIMEOUT_MS 10U
+
+/* ESP32-S3 Touch V2: counts rise when touched. Idle <30k, press >=33k. */
+#define HG_TOUCH_DEBOUNCE_MS 30U
+#define HG_TOUCH_BASELINE_SAMPLES 16U
+#define HG_TOUCH_THRESHOLD_DELTA 2000U
+
+#define HG_PAGE_SLIDE_MS 300U
+#define HG_WEATHER_IDLE_RETURN_MS (5U * 60U * 1000U)
 
 /* Lux hysteresis band: <= DARK enters low-light, >= BRIGHT returns to normal, in between holds. */
 #define HG_DISPLAY_DARK_LUX 5.0f

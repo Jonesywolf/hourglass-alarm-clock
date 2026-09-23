@@ -4,6 +4,7 @@
 #include <WiFi.h>
 
 #include "hg/config.h"
+#include "hg/log.h"
 #include "secrets.h"
 
 static uint32_t last_retry_ms = 0;
@@ -34,7 +35,7 @@ void hg_wifi_init(void) {
     retry_interval_ms = HG_WIFI_RETRY_INITIAL_MS;
     last_retry_ms = 0;
     last_begin_ms = millis();
-    Serial.printf("Connecting to %s\n", WIFI_SSID);
+    HG_LOG("wifi", "Connecting to %s\n", WIFI_SSID);
     WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
 }
 
@@ -60,7 +61,7 @@ void hg_wifi_update(void) {
 
     last_retry_ms = now;
     last_begin_ms = now;
-    Serial.printf("Retrying Wi-Fi connection (backoff %lu ms)...\n", retry_interval_ms);
+    HG_LOG("wifi", "Retrying connection (backoff %lu ms)\n", retry_interval_ms);
     WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
 
     uint32_t next_interval = retry_interval_ms << 1U;

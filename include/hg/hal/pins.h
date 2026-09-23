@@ -3,12 +3,12 @@
 
 /* Assigned pins are in use. -1 means "not wired yet". */
 
-#define HG_PIN_TFT_SCK    12
-#define HG_PIN_TFT_MOSI   11
-#define HG_PIN_TFT_CS     10
-#define HG_PIN_TFT_DC      9
-#define HG_PIN_TFT_RST    14
-#define HG_PIN_TFT_BL     (-1)
+#define HG_PIN_TFT_SCK       12
+#define HG_PIN_TFT_MOSI      11
+#define HG_PIN_TFT_CS        10
+#define HG_PIN_TFT_DC        9
+#define HG_PIN_TFT_RST       14
+#define HG_PIN_TFT_BL        (-1)
 
 #define HG_PIN_I2C_SDA       4
 #define HG_PIN_I2C_SCL       5
@@ -19,7 +19,7 @@
 #define HG_PIN_SEN66_SDA     HG_PIN_I2C_SDA
 #define HG_PIN_SEN66_SCL     HG_PIN_I2C_SCL
 
-#define HG_PIN_TOUCH      (-1)
+#define HG_PIN_TOUCH         7
 
 #define HG_PIN_ENC_A         1   /* Hardware interrupt capable */
 #define HG_PIN_ENC_B         2   /* Hardware interrupt capable */

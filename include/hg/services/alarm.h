@@ -8,5 +8,6 @@ void hg_alarm_update(void);
 void hg_alarm_get_snapshot(hg_alarm_snapshot_t *out);
 void hg_alarm_set_time(int hour, int minute);
 void hg_alarm_set_enabled(bool enabled);
+void hg_alarm_dismiss(void);
 
 #endif

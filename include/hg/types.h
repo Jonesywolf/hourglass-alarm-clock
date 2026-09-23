@@ -40,6 +40,7 @@ typedef struct {
 
 typedef struct {
     bool enabled;
+    bool ringing;
     int hour;
     int minute;
 } hg_alarm_snapshot_t;

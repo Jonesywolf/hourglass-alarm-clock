@@ -63,11 +63,14 @@ void hg_display_mode_update(void) {
             }
             break;
 
-        case HG_DISPLAY_MODE_OFF:
-            if (hg_display_mode_pre_alarm_window()) {
+        case HG_DISPLAY_MODE_OFF: {
+            hg_alarm_snapshot_t alarm;
+            hg_alarm_get_snapshot(&alarm);
+            if (alarm.ringing || hg_display_mode_pre_alarm_window()) {
                 hg_display_mode_enter(HG_DISPLAY_MODE_RED);
             }
             break;
+        }
     }
 }
 

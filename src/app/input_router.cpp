@@ -2,9 +2,11 @@
 
 #include "hg/hal/encoder.h"
 #include "hg/hal/touch.h"
+#include "hg/log.h"
 #include "hg/services/alarm.h"
 #include "hg/types.h"
 #include "hg/ui/clock_screen.h"
+#include "hg/ui/navigator.h"
 
 static void hg_input_router_apply_encoder(int32_t delta) {
     if (delta == 0) {
@@ -38,7 +40,24 @@ void hg_input_router_init(void) {
 void hg_input_router_update(void) {
     hg_touch_update();
     hg_encoder_update();
-    (void)hg_touch_is_pressed();
+
+    if (hg_touch_tapped()) {
+        hg_alarm_snapshot_t alarm;
+        hg_alarm_get_snapshot(&alarm);
+        HG_LOG("input", "tap ringing=%d page=%d\n", alarm.ringing ? 1 : 0,
+               (int)hg_navigator_current());
+        if (alarm.ringing) {
+            hg_alarm_dismiss();
+        } else if (hg_navigator_current() == HG_PAGE_CLOCK) {
+            hg_navigator_show_page(HG_PAGE_WEATHER);
+        } else {
+            hg_navigator_show_page(HG_PAGE_CLOCK);
+        }
+    }
+
+    if (hg_navigator_is_sliding()) {
+        return;
+    }
 
     if (hg_encoder_button_pressed()) {
         hg_alarm_snapshot_t alarm;
