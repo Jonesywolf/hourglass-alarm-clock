@@ -3,7 +3,7 @@
 
 #define HG_DISP_HOR_RES 320
 #define HG_DISP_VER_RES 240
-#define HG_DISP_DRAW_BUF_LINES 10
+#define HG_DISP_DRAW_BUF_LINES 40
 
 #define HG_NTP_SERVER "pool.ntp.org"
 #define HG_GMT_OFFSET_SEC (-28800L)
@@ -17,11 +17,25 @@
 #define HG_LVGL_IDLE_DELAY_MS 5
 
 /* 1 = tagged Serial logs via HG_LOG / HG_LOG_TASK. 0 on device; Serial stalls frames. */
-#define HG_LOG_DEBUG 1
+#define HG_LOG_DEBUG 0
+#define HG_LOG_TOUCH_DEBUG 1
 
 #define HG_ALARM_STORE_DEBOUNCE_MS 800U
 
-#define HG_TIME_QUERY_TIMEOUT_MS 10U
+#define HG_INPUT_POLL_MS 5U
+#define HG_INPUT_QUEUE_CAPACITY 16U
+#define HG_INPUT_MAX_AGE_MS 250U
+#define HG_POLICY_TICK_MS 20U
+#define HG_LIGHT_SAMPLE_MS 250U
+#define HG_INDOOR_SAMPLE_MS 1000U
+#define HG_SENSOR_STALE_MS 3000U
+#define HG_NETWORK_STALE_MS 5000U
+#define HG_SENSOR_RETRY_MS 5000U
+#define HG_I2C_TIMEOUT_MS 20U
+#define HG_STORE_RETRY_MS 2000U
+#define HG_STORE_QUIET_MS 500U
+#define HG_FEEDBACK_DURATION_MS 150U
+#define HG_FEEDBACK_INTERVAL_MS 80U
 
 /* ESP32-S3 Touch V2: counts rise when touched. Idle <30k, press >=33k. */
 #define HG_TOUCH_DEBOUNCE_MS 30U

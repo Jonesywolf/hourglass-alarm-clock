@@ -157,3 +157,9 @@ void hg_boot_overlay_destroy(void) {
 bool hg_boot_overlay_is_active(void) {
     return active;
 }
+
+void hg_boot_overlay_show_fault(const char *message) {
+    hg_boot_overlay_show();
+    lv_label_set_text(icon_label, "!");
+    lv_label_set_text(status_label, message);
+}

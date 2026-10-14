@@ -1,11 +1,175 @@
 
-This directory is intended for PlatformIO Test Runner and project tests.
+# Agent runbook: ESP32-S3 runtime tests
 
-Unit Testing is a software testing method by which individual units of
-source code, sets of one or more MCU program modules together with associated
-control data, usage procedures, and operating procedures, are tested to
-determine whether they are fit for use. Unit testing finds problems early
-in the development cycle.
+## Safety and prerequisites
 
-More information about PlatformIO Unit Testing:
-- https://docs.platformio.org/en/latest/advanced/unit-testing/index.html
+- Read the root AGENTS.md and README.md. Use PowerShell and the existing PlatformIO
+  installation; do not install another test framework.
+- Confirm the connected port is this clock and obtain permission before uploading.
+  COM4 was authorized for the initial implementation, not for every future session.
+- `runtime-test` replaces the firmware and automatically moves pages. Close any
+  serial monitor before running; do not stop unrelated processes by name.
+- The test suite uses real display/input/I2C/Wi-Fi hardware and the configured
+  Wi-Fi service. Do not expose secrets or captured SSIDs in external reports.
+- Ordinary persistence tests use a fake writer: they do not overwrite clock alarm
+  settings. The final cache-stall test uses only `hg-rt-test` / `probe`, refuses to
+  overwrite an existing probe, and removes that key before asserting timing.
+  The empty scratch namespace can remain. Never erase NVS/flash or reset user
+  settings to make a test pass. An interrupted scratch test may need a specifically
+  approved cleanup of that one test-owned key.
+- Do not interact with touch/encoder while automated input/timing tests run.
+
+## Commands
+
+From the repository root:
+
+```powershell
+$pio = "$env:USERPROFILE\.platformio\penv\Scripts\platformio.exe"
+& $pio device list
+& $pio run -e esp32-s3-devkitc-1
+```
+
+For the authorized device port (replace COM4 if appropriate), run the one suite
+with verbose output. `-v` is important: otherwise PlatformIO hides timing reports.
+
+```powershell
+& $pio test -e runtime-test -f test_runtime --upload-port COM4 --test-port COM4 -v
+$testExit = $LASTEXITCODE
+```
+
+No test environment/platform/compiler changes are needed for Windows. PlatformIO
+installs Unity for this test environment. VS Code's generic test discovery may
+report no tests; these are on-device PlatformIO Unity tests, not editor-discovered
+C++ tests. Do not interpret "no tests found" as a pass.
+
+**Always restore normal firmware, even after a failed/interrupted test:**
+
+```powershell
+& $pio run -e esp32-s3-devkitc-1 -t upload --upload-port COM4
+$restoreExit = $LASTEXITCODE
+```
+
+Use `try` / `finally` around test execution when automating this sequence. Capture
+the test and restoration exit codes separately so a successful restore does not
+hide a failed test. If interrupted, explicitly check what firmware remains on the
+board. Do not leave the synthetic-load test image installed.
+
+Without permission/hardware, build production and build tests without uploading:
+
+```powershell
+& $pio test -e runtime-test -f test_runtime --without-uploading --without-testing
+```
+
+Report that as compilation only; no timing, queue-concurrency, or hardware behavior
+has been verified by it.
+
+## What runs
+
+- `effects_tests.cpp`: absent backends, ringing/sunrise precedence, feedback
+  rejection/non-replay, wrap-safe expiry, cancellation generations/stop
+  acknowledgement, opt-in AQI policy, and timing histogram behavior.
+- `runtime_tests.cpp`: nonwaiting invalid time/RTC fallback, last-good brightness,
+  worker-creation failure cleanup, startup/stack margins, queue saturation and
+  expiry, navigation generations, stale/paused snapshots, save coalescing and
+  older acknowledgements, save failure/retry/admission, navigation/encoder
+  behavior, and alarm processing/dismissal during slides/the overlay.
+- `stress_tests.cpp`: repeated rendered transitions at baseline and combined load.
+  Sensor/network work is delayed by 250 ms; a separate core-0 task performs
+  sustained CPU work with brief yields to emulate an output workload. Save
+  requests are coalesced while slides remain active.
+- A separate scratch-NVS stress case performs actual writes after transitions
+  become quiet, with combined worker/CPU load, and checks capture/frame gaps.
+- Test builds can hide the boot overlay so rendering is exercised even without
+  working Wi-Fi/NTP. This does not change production overlay behavior.
+- Test-only injection/overlay/scratch hooks are gated by `HG_RUNTIME_TEST` and are
+  absent from normal firmware.
+
+## Physical touch and cold-boot verification
+
+The automated navigation tests inject input events. Passing them does not verify
+GPIO7, touch hardware acquisition, calibration, or physical press/release.
+After a touch-driver change, use regular firmware and the Serial diagnostics
+documented in README.md; do not upload another manual-test image.
+
+- Check real pad press/release and page transitions.
+- Unplug/replug at least three times, leaving the pad untouched during startup.
+  Repeat real touch navigation after every cold boot; a warm reset is insufficient.
+- Require `fresh` to advance and `age` to remain below the 30 ms debounce interval.
+  Investigate any calibration failure, scan stall, or timeout/recovery log.
+- Raw `min=max` alone cannot distinguish a stable signal from stopped hardware.
+  If `fresh` stops and `age` grows, investigate acquisition before changing the
+  threshold/debounce or debugging navigation.
+- Record physical/cold-boot results separately from the Unity test count.
+
+The checked ESP-IDF touch initialization was verified with live advancing scans
+and zero timeouts; the user confirmed touch navigation after three cold boots.
+This is hardware regression evidence, not a new automated Unity case.
+
+## Analyze the output
+
+Require the expected number of executed cases, **zero failures**, successful
+restoration, and actual timing samples. A reset/panic, watchdog message, silent
+serial timeout, ignored suite, or missing metrics is not a pass.
+The current suite contains 17 cases.
+
+1. **FRAME** reports complete rendered-frame gaps during slides, not average
+   idle-loop time. Both baseline and loaded series must have more than 24 samples,
+   no gap over **50,000 us**, and loaded p95 no more than **5,000 us** above baseline.
+   Histograms use 1 ms bins; the overflow bucket conservatively reports the maximum.
+   Do not loosen limits, reduce the load, or pause services just to pass.
+2. **CAPTURE** must remain at or below **10,000 us** maximum gap under load,
+   with zero input overflows during timing tests. Input's nominal period is 5 ms.
+   The explicit saturation test deliberately overflows once; timing tests reset
+   diagnostics first, so do not confuse that expected overflow with a load failure.
+3. **Worker max** values must exceed **200,000 us** in the loaded test. This proves
+   the intended sensor/network delays actually happened while frames continued.
+   The synthetic CPU task must also start, execute, and stop successfully.
+4. **LVGL** work/gap and **DISPLAY** transfer/pixel reports localize failures:
+   slow baseline and loaded frames alike suggest render/flush cost; loaded-only
+   regression suggests contention, logging, scheduling, or unintended UI I/O.
+   Transfer time versus full handler time distinguishes SPI bandwidth from
+   repeated font/layout/render work. A full display contains 76,800 pixels.
+   Completion timestamps come from SPI's callback, not from an idle-loop counter.
+   The callback never calls LVGL; acknowledgement remains on the UI task.
+5. **STACK** values are free bytes, not words, in this ESP-IDF build. Each worker
+   must retain more than 256 bytes in startup tests; retain comfortable measured
+   headroom when adding TLS, drivers, decoding, or larger locals.
+6. **NVS** must report four real scratch saves, nonzero write timing, successful
+   probe removal, capture <=10,000 us, and frame maximum <=50,000 us.
+   This measures the current NVS layout; it does not prove every future garbage
+   collection/erase will be hitch-free.
+7. `Alarm save failed; retry pending` is intentional in the failure-injection
+   case. That case must subsequently prove the request stayed pending and retried.
+   Other errors require investigation; do not silence them or clear dirty state.
+
+Unity can attribute an assertion's line to the suite's main file even when the
+test function is in another translation unit. Locate the named failing function
+in the files above before interpreting the line number.
+
+Report the board/environment, test counts and exit code, baseline/loaded frame
+p95 and maximum, capture maximum, worker-delay evidence, stack margins, NVS
+results, and normal-firmware restoration. Separate measured responsiveness from
+subjective visual confirmation and from still-unimplemented LED/audio/AQI features.
+
+Actual audio/RMT integration must add checks for buffer underruns/transmission
+errors, memory/peripheral headroom, real device timing, and combined output load.
+The test suite does not yet drive an SK6812, speaker, or SEN66.
+
+## Reference measurement
+
+The initial asynchronous-display implementation passed all 17 cases on the clock:
+baseline and loaded frame p95 were both 33 ms, loaded frame maximum was 32.408 ms,
+and maximum capture gap was 5.491 ms. Sensor/network delays exceeded 250 ms while
+the synthetic core-0 output load ran. Worker free-stack margins were 1,920 /
+2,492 / 3,884 bytes (input / sensor / network). Four real scratch-NVS saves passed;
+the longest was 21.048 ms. Normal firmware was rebuilt and uploaded afterward.
+
+The production linker reported 169,720 bytes static RAM and 1,088,025 bytes flash.
+The remaining 157,960 bytes of internal RAM is not a live free-heap measurement:
+task stacks, Wi-Fi, and other dynamic allocations use that budget. PSRAM is
+separate. Measure current/minimum internal heap and the largest DMA-capable block
+under actual playback before adding audio buffers; linker headroom alone is not
+evidence that a future allocation will succeed.
+
+These are reference observations, not substitute thresholds or guarantees for a
+different build, scene, flash layout, or future hardware integration.

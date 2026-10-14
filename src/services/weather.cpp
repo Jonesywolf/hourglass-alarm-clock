@@ -7,6 +7,8 @@ void hg_weather_init(void) {
     snapshot.temp_c = 0.0f;
     snapshot.weather_code = 0;
     snapshot.aqi = 0;
+    snapshot.sampled_ms = 0;
+    snapshot.status = HG_SAMPLE_UNAVAILABLE;
 }
 
 void hg_weather_update(void) {}

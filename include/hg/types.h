@@ -5,6 +5,30 @@
 #include <stdint.h>
 
 typedef enum {
+    HG_SAMPLE_WAITING = 0,
+    HG_SAMPLE_READY,
+    HG_SAMPLE_STALE,
+    HG_SAMPLE_PAUSED,
+    HG_SAMPLE_UNAVAILABLE,
+    HG_SAMPLE_ERROR
+} hg_sample_status_t;
+
+typedef struct {
+    bool valid;
+    float lux;
+    uint32_t sampled_ms;
+    hg_sample_status_t status;
+} hg_light_snapshot_t;
+
+typedef struct {
+    uint32_t captured_ms;
+    uint32_t generation;
+    bool tapped;
+    bool encoder_pressed;
+    int32_t encoder_delta;
+} hg_input_event_t;
+
+typedef enum {
     HG_PAGE_CLOCK = 0,
     HG_PAGE_WEATHER,
     HG_PAGE_SETTINGS,
@@ -58,6 +82,8 @@ typedef struct {
     float humidity;
     float pm2_5;
     int aqi;
+    uint32_t sampled_ms;
+    hg_sample_status_t status;
 } hg_indoor_snapshot_t;
 
 typedef struct {
@@ -65,6 +91,8 @@ typedef struct {
     float temp_c;
     int weather_code;
     int aqi;
+    uint32_t sampled_ms;
+    hg_sample_status_t status;
 } hg_weather_snapshot_t;
 
 #endif

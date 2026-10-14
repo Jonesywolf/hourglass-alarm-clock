@@ -3,7 +3,6 @@
 #include <Arduino.h>
 
 #include "hg/config.h"
-#include "hg/hal/speaker.h"
 #include "hg/log.h"
 #include "hg/services/store.h"
 #include "hg/services/time.h"
@@ -18,7 +17,6 @@ static void hg_alarm_stop_ringing(void) {
         return;
     }
     snapshot.ringing = false;
-    hg_speaker_set_mode(HG_SPEAKER_STOP);
 }
 
 void hg_alarm_init(void) {
@@ -34,7 +32,7 @@ void hg_alarm_init(void) {
 
 void hg_alarm_update(void) {
     if (dirty && (millis() - last_change_ms >= HG_ALARM_STORE_DEBOUNCE_MS)) {
-        hg_store_save_alarm(&snapshot);
+        hg_store_request_save_alarm(&snapshot);
         dirty = false;
     }
 
@@ -58,7 +56,6 @@ void hg_alarm_update(void) {
 
     snapshot.ringing = true;
     fired_this_window = true;
-    hg_speaker_set_mode(HG_SPEAKER_HARD);
     HG_LOG("alarm", "ringing %02d:%02d\n", snapshot.hour, snapshot.minute);
 }
 
@@ -81,7 +78,7 @@ void hg_alarm_set_enabled(bool enabled) {
         hg_alarm_stop_ringing();
         fired_this_window = false;
     }
-    hg_store_save_alarm(&snapshot);
+    hg_store_request_save_alarm(&snapshot);
 }
 
 void hg_alarm_dismiss(void) {

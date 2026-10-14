@@ -16,7 +16,8 @@ void hg_time_get_snapshot(hg_time_snapshot_t *out) {
     }
 
     struct tm timeinfo;
-    if (!getLocalTime(&timeinfo, HG_TIME_QUERY_TIMEOUT_MS)) {
+    time_t now = time(nullptr);
+    if (!localtime_r(&now, &timeinfo) || timeinfo.tm_year <= (2016 - 1900)) {
         if (!hg_rtc_get_time(out)) {
             out->valid = false;
             out->hour_24 = 0;

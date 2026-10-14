@@ -41,3 +41,17 @@ Change `include/hg/<area>/<mod>.h` and `src/<area>/<mod>.cpp` only. Do not open 
 Keep a single `-Iinclude` in `platformio.ini`. Do not add nested `-Isrc/hal` flags. Add `lib_deps` only when the HAL/service that needs them is implemented.
 
 Secrets stay in gitignored `include/secrets.h`. Copy `include/secrets.example.h`. UI must never include secrets.
+
+## Runtime and tests
+
+- Only the Arduino UI task calls LVGL or mutates navigation/alarm/effect policy.
+  Never add sensor/network/flash/audio waits to that task. App connects workers
+  through bounded POD handoffs; see [runtime ownership](README.md#runtime-ownership).
+- Keep I2C in the sensor worker. Preserve snapshot validity/freshness/error status,
+  output generation/stop semantics, and flash-write admission during transitions.
+- For runtime, input, persistence, display, or effect-policy changes, follow the
+  [test runbook](test/README). It contains exact PlatformIO commands, required
+  frame/capture thresholds, failure interpretation, and scratch-NVS safeguards.
+- Obtain device/port and upload permission; never assume a previous session's
+  COM4 permission still applies. Always restore normal firmware after tests,
+  including failures. Report measured timing and restoration, not just build success.

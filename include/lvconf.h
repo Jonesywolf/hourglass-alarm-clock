@@ -4,7 +4,7 @@
 #include <stdint.h>
 
 #define LV_COLOR_DEPTH 16          // 16-bit RGB565 (standard for most SPI/IPS screens)
-#define LV_COLOR_16_SWAP 0         // Set to 1 if display colors look inverted/blue-shifted
+#define LV_COLOR_16_SWAP 1         // RGB565 in SPI wire order; avoids a DMA staging copy
 
 /* Memory Settings */
 #define LV_MEM_CUSTOM 0            // Use LVGL's internal memory manager

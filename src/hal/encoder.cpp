@@ -9,21 +9,29 @@ static const uint32_t HG_ENC_BTN_DEBOUNCE_MS = 30;
 
 static volatile uint8_t enc_state = HG_ENC_R_START;
 static volatile int32_t enc_delta = 0;
+static portMUX_TYPE enc_mux = portMUX_INITIALIZER_UNLOCKED;
 static bool enc_ready = false;
 
 static bool enc_btn_last_stable = false;
+static bool enc_btn_last_raw = false;
 static uint32_t enc_btn_last_change_ms = 0;
 static bool enc_btn_pressed_edge = false;
 
 static void IRAM_ATTR hg_encoder_isr(void) {
+    portENTER_CRITICAL_ISR(&enc_mux);
     uint8_t pin_state = (uint8_t)((digitalRead(HG_PIN_ENC_A) << 1) | digitalRead(HG_PIN_ENC_B));
     enc_state = hg_encoder_table[enc_state & 0x0F][pin_state];
     uint8_t direction = enc_state & 0x30;
     if (direction == HG_ENC_DIR_CW) {
-        enc_delta++;
+        if (enc_delta < INT32_MAX) {
+            enc_delta++;
+        }
     } else if (direction == HG_ENC_DIR_CCW) {
-        enc_delta--;
+        if (enc_delta > INT32_MIN) {
+            enc_delta--;
+        }
     }
+    portEXIT_CRITICAL_ISR(&enc_mux);
 }
 
 bool hg_encoder_init(void) {
@@ -40,6 +48,8 @@ bool hg_encoder_init(void) {
     if (HG_PIN_ENC_BTN >= 0) {
         pinMode(HG_PIN_ENC_BTN, INPUT_PULLUP);
         enc_btn_last_stable = (digitalRead(HG_PIN_ENC_BTN) == LOW);
+        enc_btn_last_raw = enc_btn_last_stable;
+        enc_btn_last_change_ms = millis();
     }
 
     enc_ready = true;
@@ -54,8 +64,11 @@ void hg_encoder_update(void) {
     bool raw_pressed = (digitalRead(HG_PIN_ENC_BTN) == LOW);
     uint32_t now = millis();
 
-    if (raw_pressed != enc_btn_last_stable && (now - enc_btn_last_change_ms) >= HG_ENC_BTN_DEBOUNCE_MS) {
+    if (raw_pressed != enc_btn_last_raw) {
+        enc_btn_last_raw = raw_pressed;
         enc_btn_last_change_ms = now;
+    }
+    if (raw_pressed != enc_btn_last_stable && (now - enc_btn_last_change_ms) >= HG_ENC_BTN_DEBOUNCE_MS) {
         enc_btn_last_stable = raw_pressed;
         if (raw_pressed) {
             enc_btn_pressed_edge = true;
@@ -68,10 +81,10 @@ int32_t hg_encoder_take_delta(void) {
         return 0;
     }
 
-    noInterrupts();
+    portENTER_CRITICAL(&enc_mux);
     int32_t delta = enc_delta;
     enc_delta = 0;
-    interrupts();
+    portEXIT_CRITICAL(&enc_mux);
     return delta;
 }
 
@@ -79,6 +92,11 @@ bool hg_encoder_button_pressed(void) {
     if (!enc_btn_pressed_edge) {
         return false;
     }
+
     enc_btn_pressed_edge = false;
     return true;
+}
+
+bool hg_encoder_button_is_pressed(void) {
+    return enc_ready && enc_btn_last_stable;
 }

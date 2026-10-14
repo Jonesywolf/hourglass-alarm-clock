@@ -2,12 +2,26 @@
 #define HG_LOG_H
 
 #include "hg/config.h"
+#include <stdint.h>
 
-#if HG_LOG_DEBUG
 #include <Arduino.h>
 
+void hg_log_init(void);
+void hg_log_write(const char *tag, const char *format, ...);
+void hg_log_flush(void);
+uint32_t hg_log_dropped(void);
+
+#define HG_ERROR(tag, fmt, ...) hg_log_write((tag), (fmt), ##__VA_ARGS__)
+
+#if HG_LOG_TOUCH_DEBUG
+#define HG_TOUCH_LOG(tag, fmt, ...) hg_log_write((tag), (fmt), ##__VA_ARGS__)
+#else
+#define HG_TOUCH_LOG(tag, fmt, ...) ((void)0)
+#endif
+
+#if HG_LOG_DEBUG
 #define HG_LOG(tag, fmt, ...) \
-    Serial.printf("[%8lu %-8s] " fmt, (unsigned long)millis(), (tag), ##__VA_ARGS__)
+    hg_log_write((tag), (fmt), ##__VA_ARGS__)
 
 #define HG_LOG_TASK(tag, stmt) \
     do { \

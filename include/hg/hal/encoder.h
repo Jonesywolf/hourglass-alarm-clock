@@ -8,5 +8,6 @@ bool hg_encoder_init(void);
 void hg_encoder_update(void);
 int32_t hg_encoder_take_delta(void);
 bool hg_encoder_button_pressed(void);
+bool hg_encoder_button_is_pressed(void);
 
 #endif

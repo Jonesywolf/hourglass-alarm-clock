@@ -3,6 +3,7 @@
 
 #include <stdbool.h>
 #include <stdint.h>
+#include "hg/types.h"
 
 typedef enum {
     HG_LIGHT_DARK = 0,
@@ -11,7 +12,7 @@ typedef enum {
 } hg_light_level_t;
 
 void hg_brightness_init(void);
-void hg_brightness_update(void);
+void hg_brightness_update(const hg_light_snapshot_t *light);
 hg_light_level_t hg_brightness_get_light_level(void);
 uint8_t hg_brightness_get_percent(void);
 

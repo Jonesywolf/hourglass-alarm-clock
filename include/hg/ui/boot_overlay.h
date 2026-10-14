@@ -12,5 +12,6 @@ void hg_boot_overlay_update(
 	const char *ssid);
 void hg_boot_overlay_destroy(void);
 bool hg_boot_overlay_is_active(void);
+void hg_boot_overlay_show_fault(const char *message);
 
 #endif
