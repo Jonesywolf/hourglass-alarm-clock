@@ -4,6 +4,7 @@
 #include <freertos/event_groups.h>
 
 #include "hg/config.h"
+#include "hg/hal/speaker.h"
 #include "hg/log.h"
 #include "hg/services/store.h"
 #include "runtime_internal.h"
@@ -11,17 +12,24 @@
 QueueHandle_t hg_input_queue = nullptr;
 QueueHandle_t hg_sensor_mailbox = nullptr;
 QueueHandle_t hg_network_mailbox = nullptr;
-static StaticQueue_t input_state, sensor_state, network_state;
+QueueHandle_t hg_audio_command_mailbox = nullptr;
+QueueHandle_t hg_audio_status_mailbox = nullptr;
+static StaticQueue_t input_state, sensor_state, network_state, audio_command_state,
+                     audio_status_state;
 static uint8_t input_storage[HG_INPUT_QUEUE_CAPACITY * sizeof(hg_input_event_t)];
 static uint8_t sensor_storage[sizeof(hg_sensor_snapshot_t)];
 static uint8_t network_storage[sizeof(hg_network_snapshot_t)];
+static uint8_t audio_command_storage[sizeof(hg_audio_command_t)];
+static uint8_t audio_status_storage[sizeof(hg_audio_status_t)];
 static StaticEventGroup_t start_state;
 static EventGroupHandle_t start_event = nullptr;
-static TaskHandle_t workers[3] = {};
+/* Indexes match the start order table in hg_runtime_start(): input, sensors, network, store, audio. */
+static TaskHandle_t workers[5] = {};
 static portMUX_TYPE mux = portMUX_INITIALIZER_UNLOCKED;
 static hg_runtime_controls_t controls = {1, 1, false, false};
 static hg_runtime_diagnostics_t diagnostics;
 static bool running = false;
+static bool audio_running = false;
 static const char *startup_fault = nullptr;
 static uint32_t last_ui_us = 0;
 static bool ui_was_sliding = false;
@@ -79,7 +87,16 @@ bool hg_runtime_start(void) {
     hg_network_mailbox = xQueueCreateStatic(1, sizeof(hg_network_snapshot_t),
                                            network_storage, &network_state);
     start_event = xEventGroupCreateStatic(&start_state);
-    if (!hg_input_queue || !hg_sensor_mailbox || !hg_network_mailbox || !start_event) {
+    const bool audio_enabled = hg_speaker_ready();
+    audio_running = false;
+    if (audio_enabled) {
+        hg_audio_command_mailbox = xQueueCreateStatic(1, sizeof(hg_audio_command_t),
+                                                      audio_command_storage, &audio_command_state);
+        hg_audio_status_mailbox = xQueueCreateStatic(1, sizeof(hg_audio_status_t),
+                                                     audio_status_storage, &audio_status_state);
+    }
+    if (!hg_input_queue || !hg_sensor_mailbox || !hg_network_mailbox || !start_event ||
+        (audio_enabled && (!hg_audio_command_mailbox || !hg_audio_status_mailbox))) {
         startup_fault = "Runtime queue allocation failed";
         HG_ERROR("runtime", "%s\n", startup_fault);
         return false;
@@ -88,11 +105,21 @@ bool hg_runtime_start(void) {
     hg_network_snapshot_t network = {};
     xQueueOverwrite(hg_sensor_mailbox, &sensors);
     xQueueOverwrite(hg_network_mailbox, &network);
+    if (audio_enabled) {
+        hg_audio_status_t audio = {};
+        xQueueOverwrite(hg_audio_status_mailbox, &audio);
+    }
+    /* Index 3 is the store worker, 4 the optional audio worker. */
     TaskFunction_t entries[] = {hg_input_capture_task, hg_sensor_worker_task,
-                               hg_network_worker_task};
-    const char *names[] = {"hg-input", "hg-sensors", "hg-network"};
-    const uint32_t stacks[] = {3072, 4096, 6144};
-    for (unsigned i = 0; i < 4; ++i) {
+                               hg_network_worker_task, nullptr, hg_audio_worker_task};
+    const char *names[] = {"hg-input", "hg-sensors", "hg-network", "hg-store", "hg-audio"};
+    const uint32_t stacks[] = {3072, 4096, 6144, 0, 4096};
+    /* The store worker cannot be stopped, so it starts last; a failed start leaves nothing behind. */
+    const unsigned order[] = {0, 1, 2, 4, 3};
+    for (unsigned i : order) {
+        if (i == 4 && !audio_enabled) {
+            continue;
+        }
         bool ok = true;
 #ifdef HG_RUNTIME_TEST
         ok = fail_worker != (int)i;
@@ -100,7 +127,7 @@ bool hg_runtime_start(void) {
         if (ok) {
             ok = i == 3 ? hg_store_start_worker() :
                  xTaskCreatePinnedToCore(entries[i], names[i], stacks[i], nullptr,
-                                         i == 0 ? 2 : 1, &workers[i],
+                                         i == 0 ? 2 : i == 4 ? 3 : 1, &workers[i],
                                          i == 0 ? ARDUINO_RUNNING_CORE : 0) == pdPASS;
         }
         if (!ok) {
@@ -115,6 +142,7 @@ bool hg_runtime_start(void) {
             return false;
         }
     }
+    audio_running = audio_enabled;
     running = true;
     xEventGroupSetBits(start_event, 1);
     return true;
@@ -197,6 +225,27 @@ void hg_runtime_get_network(hg_network_snapshot_t *out) {
         return;
     }
     out->stale = !out->ready || millis() - out->updated_ms >= HG_NETWORK_STALE_MS;
+}
+
+bool hg_runtime_audio_running(void) {
+    return audio_running;
+}
+
+void hg_runtime_set_audio_command(const hg_audio_command_t *command) {
+    if (audio_running && command) {
+        xQueueOverwrite(hg_audio_command_mailbox, command);
+    }
+}
+
+bool hg_runtime_get_audio_status(hg_audio_status_t *out) {
+    return audio_running && out && xQueuePeek(hg_audio_status_mailbox, out, 0) == pdTRUE;
+}
+
+void hg_runtime_record_audio(uint32_t underruns, uint32_t write_errors) {
+    portENTER_CRITICAL(&mux);
+    diagnostics.audio_underruns = underruns;
+    diagnostics.audio_write_errors = write_errors;
+    portEXIT_CRITICAL(&mux);
 }
 
 bool hg_runtime_publish_input(const hg_input_event_t *event) {
@@ -285,8 +334,12 @@ void hg_runtime_get_diagnostics(hg_runtime_diagnostics_t *out) {
 void hg_runtime_reset_diagnostics(void) {
     portENTER_CRITICAL(&mux);
     bool input_fault = diagnostics.input_fault;
+    uint32_t audio_underruns = diagnostics.audio_underruns;
+    uint32_t audio_write_errors = diagnostics.audio_write_errors;
     diagnostics = {};
     diagnostics.input_fault = input_fault;
+    diagnostics.audio_underruns = audio_underruns;
+    diagnostics.audio_write_errors = audio_write_errors;
     ui_was_sliding = false;
     portEXIT_CRITICAL(&mux);
 }

@@ -20,7 +20,13 @@ void test_save_coalescing_and_acknowledgement(void);
 void test_save_retry_and_admission(void);
 void test_navigation_and_encoder_routing(void);
 void test_alarm_during_slide_and_overlay(void);
+void test_sound_mapping_and_availability(void);
+void test_sound_ramp_loop_and_limits(void);
+void test_alarm_snooze_keeps_saved_time(void);
+void test_encoder_stops_alarm_without_disabling(void);
+void test_audio_worker_plays_acks_and_stops(void);
 void test_combined_load_frame_timing(void);
+void test_audio_playback_under_load(void);
 void test_real_nvs_admission_timing(void);
 
 void setUp(void) {}
@@ -49,7 +55,13 @@ void setup(void) {
     RUN_TEST(test_save_retry_and_admission);
     RUN_TEST(test_navigation_and_encoder_routing);
     RUN_TEST(test_alarm_during_slide_and_overlay);
+    RUN_TEST(test_sound_mapping_and_availability);
+    RUN_TEST(test_sound_ramp_loop_and_limits);
+    RUN_TEST(test_alarm_snooze_keeps_saved_time);
+    RUN_TEST(test_encoder_stops_alarm_without_disabling);
+    RUN_TEST(test_audio_worker_plays_acks_and_stops);
     RUN_TEST(test_combined_load_frame_timing);
+    RUN_TEST(test_audio_playback_under_load);
     RUN_TEST(test_real_nvs_admission_timing);
     UNITY_END();
 }

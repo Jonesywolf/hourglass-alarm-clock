@@ -12,6 +12,7 @@
 #include "hg/services/time.h"
 #include "hg/ui/boot_overlay.h"
 #include "hg/ui/navigator.h"
+#include "hg/ui/overlays.h"
 
 static bool wait_for_save(uint32_t timeout_ms) {
     uint32_t start = millis();
@@ -97,6 +98,9 @@ void test_app_startup(void) {
     TEST_ASSERT_GREATER_THAN_UINT32(100, diagnostics.capture_gap.samples);
     for (unsigned i = 0; i < 3; ++i) {
         TEST_ASSERT_GREATER_THAN_UINT32(256, diagnostics.stack_free_bytes[i]);
+    }
+    if (hg_runtime_audio_running()) {
+        TEST_ASSERT_GREATER_THAN_UINT32(256, diagnostics.stack_free_bytes[3]);
     }
 }
 
@@ -281,7 +285,8 @@ void test_alarm_during_slide_and_overlay(void) {
     hg_alarm_snapshot_t alarm;
     hg_alarm_get_snapshot(&alarm);
     TEST_ASSERT_TRUE(alarm.ringing);
-    TEST_ASSERT_EQUAL(HG_PAGE_CLOCK, hg_navigator_current());
+    /* The alarm screen overlays whichever page is showing; no page jump is needed. */
+    TEST_ASSERT_TRUE(hg_overlays_alarm_visible());
     hg_wifi_snapshot_t disconnected = {};
     hg_time_snapshot_t invalid = {};
     hg_boot_overlay_update(&disconnected, &invalid, "test");
@@ -291,8 +296,13 @@ void test_alarm_during_slide_and_overlay(void) {
     hg_app_loop();
     hg_alarm_get_snapshot(&alarm);
     TEST_ASSERT_FALSE(alarm.ringing);
+    TEST_ASSERT_TRUE(alarm.snoozed);
     TEST_ASSERT_TRUE(hg_boot_overlay_is_active());
     hg_alarm_set_enabled(false);
     hg_app_test_hide_boot_overlay(true);
     finish_slide();
+    uint32_t settle = millis();
+    while (hg_overlays_alarm_visible() && millis() - settle < HG_ALARM_CONFIRM_MS + 3000U) {
+        hg_app_loop();
+    }
 }

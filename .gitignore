@@ -1,3 +1,6 @@
 .pio
 .vscode/
 include/secrets.h
+.fonts-cache/
+*.ttf
+*.otf

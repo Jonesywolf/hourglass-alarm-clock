@@ -21,6 +21,27 @@
 #define HG_LOG_TOUCH_DEBUG 1
 
 #define HG_ALARM_STORE_DEBOUNCE_MS 800U
+#define HG_ALARM_SNOOZE_MIN 15
+/* After a dismiss/snooze, an encoder press must not also toggle the alarm off. */
+#define HG_ALARM_TOGGLE_LOCKOUT_MS 2000U
+#define HG_ALARM_CONFIRM_MS 2500U
+
+/* Alarm audio. The clip in src/services/sound_alarm_clip.cpp must use HG_AUDIO_SAMPLE_RATE. */
+#define HG_AUDIO_SAMPLE_RATE 16000U
+#define HG_AUDIO_CHUNK_FRAMES 256U
+#define HG_AUDIO_DMA_BUF_COUNT 6U
+#define HG_AUDIO_WRITE_TIMEOUT_MS 100U
+#define HG_AUDIO_RETRY_MS 1000U
+#define HG_AUDIO_FADE_IN_MS 50U
+#ifdef HG_RUNTIME_TEST
+/* Automated tests ring the alarm on real hardware; keep them quiet. */
+#define HG_ALARM_VOLUME_START_PCT 1
+#define HG_ALARM_VOLUME_MAX_PCT 2
+#else
+#define HG_ALARM_VOLUME_START_PCT 5
+#define HG_ALARM_VOLUME_MAX_PCT 60
+#endif
+#define HG_ALARM_RAMP_MS 30000U
 
 #define HG_INPUT_POLL_MS 5U
 #define HG_INPUT_QUEUE_CAPACITY 16U

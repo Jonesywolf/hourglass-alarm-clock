@@ -67,6 +67,8 @@ typedef struct {
     bool ringing;
     int hour;
     int minute;
+    /* While snoozed, hour/minute are the temporary ring time; the saved time is restored on dismiss. */
+    bool snoozed;
 } hg_alarm_snapshot_t;
 
 typedef struct {

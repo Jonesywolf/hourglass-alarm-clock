@@ -15,6 +15,7 @@ does not give permission to call it from a screen or the UI loop.
 | Sensor worker | 0 / 1 | All shared `Wire` access, light and indoor-air acquisition |
 | Network worker | 0 / 1 | Wi-Fi maintenance, weather/phone service work, bounded diagnostic output |
 | Persistence worker | 0 / 1 | Coalesced Preferences saves and acknowledgements |
+| Audio worker | 0 / 3 | I2S playback of the commanded sound; exists only if the speaker initialized |
 
 Workers start behind a readiness gate. Allocation/start failures produce a visible
 fault rather than falling back to blocking I/O on the UI task. Input calibration
@@ -54,8 +55,8 @@ that in future audio/DMA budgets. This is not a guarantee of 60 fps.
 ## Effects and indoor-air policy
 
 `include/hg/services/effects.h` is UI-task-owned, deterministic policy, not a
-playback engine. Current speaker/LED HAL implementations remain unavailable stubs;
-feedback requests do not pretend those outputs are active.
+playback engine. The speaker is implemented (see "Alarm and audio" below); the LED
+HAL is still an unavailable stub. Feedback requests do not pretend an output is active.
 
 - Ringing takes precedence over sunrise; either alarm phase reserves **both**
   LED/audio channels over interaction feedback.
@@ -77,11 +78,61 @@ feedback requests do not pretend those outputs are active.
   stop/restart, warm-up, thermal cooldown, and fresh-data rules need actual driver
   support. No thermal-control guarantee is made by this policy.
 
-Sunrise scheduling, ramp duration, animation content, sound format, and actual
-LED/audio/SEN66/weather integration are not implemented here. Future sunrise
+Sunrise scheduling, ramp duration, animation content, and actual
+LED/SEN66/weather integration are not implemented here. Future sunrise
 progress should use elapsed monotonic time, not UI frame counts. Use hardware RMT
-for SK6812 output and I2S DMA/buffered audio; do not bit-bang LEDs or decode/play
-audio on the UI task. Recheck shared internal-memory, peripheral, and CPU budgets.
+for SK6812 output; do not bit-bang LEDs. Recheck shared internal-memory, peripheral,
+and CPU budgets, and merge any LED worker's applied state into the same
+`hg_effects_report_applied()` call the audio path uses.
+
+## Alarm and audio
+
+**Interaction while the alarm rings** (`src/app/input_router.cpp` is the only place
+that interprets it; all of it works during slides and the boot overlay):
+
+- Touch tap: snooze for `HG_ALARM_SNOOZE_MIN` (15) minutes. Snoozing is temporary and
+  in-memory: the alarm label shows the snoozed time, nothing is saved, and a reboot
+  during a snooze forgets it.
+- Encoder press: stop. This dismisses the ring or cancels a snooze and restores the
+  saved time; the alarm stays enabled for tomorrow. Rotation is ignored while
+  ringing or snoozed.
+- The press that stops the alarm is consumed, and the enable toggle is ignored for
+  `HG_ALARM_TOGGLE_LOCKOUT_MS` afterward, so mashing the knob cannot disable the
+  alarm. Idle behavior is unchanged: a press toggles enabled and saves it.
+- The alarm screen is a transient overlay (`ui/overlays.*`, LVGL top layer) with
+  snooze/stop hints. After an action it briefly confirms "Snoozed until", "Next
+  alarm" or "Alarm off".
+
+**Audio path.** `effects` generation + phase → `hg_sound_for_effects()` → an
+`hg_audio_command_t` in a length-one mailbox → the audio worker → `hal/speaker`
+(legacy ESP-IDF I2S driver, 16 kHz 16-bit, mono duplicated into both slots,
+MAX98357A SD_MODE held low until playback). The worker reports the generation it
+applied; the UI feeds that into `hg_effects_report_applied()`. A stop is always
+acknowledged, which clears `stop_pending` and re-admits flash writes. While audio is
+active or stopping, effects are timing-sensitive, so flash writes are deferred.
+
+- `services/sound` is hardware-free: a descriptor table, a looping renderer, and the
+  volume ramp (`HG_ALARM_VOLUME_START_PCT` → `HG_ALARM_VOLUME_MAX_PCT` over
+  `HG_ALARM_RAMP_MS`, measured in rendered audio frames, plus a short fade-in).
+  Tune the cap on the device; automated test builds use 1-2 % so they stay quiet.
+- Only `HG_SOUND_ALARM` has a sample. `HG_SOUND_UI_NAVIGATE` / `HG_SOUND_UI_ALARM_EDIT`
+  are mapped from feedback but have no clip, so they render as silence. To add one,
+  embed a clip, add a descriptor row in `sound.cpp`, and nothing else changes.
+- The DMA ring is 6 × 256 frames (~96 ms, ~6 KB internal RAM). A write error or
+  timeout stops playback and retries after `HG_AUDIO_RETRY_MS`. `underruns` is
+  inferred from refill gaps longer than the ring can cover; check it with
+  `hg_runtime_get_diagnostics()` (cumulative, not cleared by reset).
+- A flash write already in flight when the alarm starts is covered by the DMA ring
+  (measured NVS writes are tens of ms); new writes are then deferred.
+- The clip is `assets/audio/alarm_clip_16k_mono.wav` (CC0, see
+  `assets/audio/ATTRIBUTION.md`). Regenerate the embedded copy after replacing it:
+
+```powershell
+& "$env:USERPROFILE\.platformio\penv\Scripts\python.exe" tools\audio\wav_to_pcm.py
+```
+
+`src/services/sound_alarm_clip.cpp` is generated; do not edit or open it. The WAV must
+be mono, 16-bit, `HG_AUDIO_SAMPLE_RATE`, and end in silence so the loop point is clean.
 
 ## Persistence
 
@@ -149,6 +200,29 @@ firmware, then unplug/replug and repeat on multiple cold boots with the pad
 untouched during calibration. Require `fresh` to keep increasing, low `age`,
 and no unexplained timeout/stall errors. A successful upload or warm reset alone
 does not verify the cold-boot failure.
+
+## Fonts
+
+Generated LVGL fonts under `src/ui/assets/fonts/` are described by
+[`tools/fonts/fonts.json`](tools/fonts/fonts.json): each entry names a source font
+(Google Fonts / Material Icons, pinned by commit URL and SHA-256), a pixel size, and
+the glyphs to keep. Select glyphs with `icons` (Material icon names), `codepoints`,
+`ranges`, or `text`; variable fonts take `variations` (e.g. Inter `opsz`/`wght`).
+
+```powershell
+$pio = "$env:USERPROFILE\.platformio\penv\Scripts\platformio.exe"
+& $pio run -t fonts                 # regenerate everything
+$env:HG_FONTS = "icons_36"; & $pio run -t fonts   # only some fonts (comma-separated)
+& $pio run -t fonts-force           # also re-download sources and reinstall converters
+& "$env:USERPROFILE\.platformio\penv\Scripts\python.exe" tools\fonts\generate_fonts.py --list
+```
+
+Source font files are downloaded on demand into the gitignored `.fonts-cache/`
+(`*.ttf` / `*.otf` are also ignored); only the generated `.c` files are committed.
+Node.js is required for `lv_font_conv`; `fonttools` is installed into the cache for
+variable-font instances. After adding a font, declare it in `include/hg/ui/fonts.h`.
+The existing Wi-Fi icon fonts were first generated from Google's TTF; the official
+repository only ships OTF, so regenerating them can change anti-aliasing slightly.
 
 ## Build and tests
 

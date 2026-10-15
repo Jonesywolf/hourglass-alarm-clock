@@ -10,6 +10,7 @@
 #include "hg/config.h"
 #include "hg/hal/display.h"
 #include "hg/services/alarm.h"
+#include "hg/services/effects.h"
 #include "hg/services/store.h"
 #include "hg/ui/navigator.h"
 
@@ -129,6 +130,58 @@ void test_combined_load_frame_timing(void) {
     TEST_ASSERT_EQUAL_UINT32(0, loaded_diagnostics.input_overflows);
     TEST_ASSERT_GREATER_THAN_UINT32(200000, loaded_diagnostics.sensor_max_us);
     TEST_ASSERT_GREATER_THAN_UINT32(200000, loaded_diagnostics.network_max_us);
+    TEST_ASSERT_TRUE(cpu_load_ok);
+}
+
+void test_ring_alarm_now(void);
+
+void test_audio_playback_under_load(void) {
+    hg_app_test_hide_boot_overlay(true);
+    TEST_ASSERT_TRUE_MESSAGE(hg_runtime_audio_running(), "speaker/audio worker not running");
+    hg_runtime_diagnostics_t before;
+    hg_runtime_get_diagnostics(&before);
+    test_ring_alarm_now();
+    uint32_t started = millis();
+    hg_effects_snapshot_t effects = {};
+    hg_audio_status_t status = {};
+    bool active = false;
+    while (!active && millis() - started < 1000U) {
+        hg_app_loop();
+        hg_effects_get_snapshot(&effects);
+        active = hg_runtime_get_audio_status(&status) && status.generation == effects.generation &&
+                 status.active;
+    }
+    TEST_ASSERT_TRUE(active);
+
+    hg_timing_stats_t frames;
+    hg_runtime_diagnostics_t loaded;
+    transitions(true, &frames, &loaded);
+    hg_effects_get_snapshot(&effects);
+    bool still_active = hg_runtime_get_audio_status(&status) &&
+                        status.generation == effects.generation && status.active;
+    uint32_t underruns = loaded.audio_underruns - before.audio_underruns;
+    uint32_t errors = loaded.audio_write_errors - before.audio_write_errors;
+    Serial.printf("AUDIO LOAD frames n=%lu p95=%luus max=%luus capture max=%luus underruns=%lu errors=%lu stack_free=%lu\n",
+                  (unsigned long)frames.samples,
+                  (unsigned long)hg_timing_percentile_us(&frames, 95),
+                  (unsigned long)frames.max_us, (unsigned long)loaded.capture_gap.max_us,
+                  (unsigned long)underruns, (unsigned long)errors,
+                  (unsigned long)loaded.stack_free_bytes[3]);
+    hg_alarm_dismiss();
+    hg_alarm_set_enabled(false);
+    uint32_t settle = millis();
+    while (millis() - settle < 3500U) {
+        hg_app_loop();
+    }
+    TEST_ASSERT_TRUE(still_active);
+    TEST_ASSERT_GREATER_THAN_UINT32(24, frames.samples);
+    TEST_ASSERT_LESS_OR_EQUAL_UINT32(50000, frames.max_us);
+    TEST_ASSERT_LESS_OR_EQUAL_UINT32(10000, loaded.capture_gap.max_us);
+    TEST_ASSERT_EQUAL_UINT32(0, loaded.input_overflows);
+    TEST_ASSERT_GREATER_THAN_UINT32(200000, loaded.sensor_max_us);
+    TEST_ASSERT_EQUAL_UINT32(0, underruns);
+    TEST_ASSERT_EQUAL_UINT32(0, errors);
+    TEST_ASSERT_GREATER_THAN_UINT32(256, loaded.stack_free_bytes[3]);
     TEST_ASSERT_TRUE(cpu_load_ok);
 }
 

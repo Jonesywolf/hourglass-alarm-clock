@@ -17,16 +17,20 @@ typedef struct {
 extern QueueHandle_t hg_input_queue;
 extern QueueHandle_t hg_sensor_mailbox;
 extern QueueHandle_t hg_network_mailbox;
+extern QueueHandle_t hg_audio_command_mailbox;
+extern QueueHandle_t hg_audio_status_mailbox;
 
 void hg_runtime_wait_start(void);
 hg_runtime_controls_t hg_runtime_controls(void);
 bool hg_runtime_publish_input(const hg_input_event_t *event);
 void hg_runtime_record_capture(uint32_t gap_us, bool touch, bool encoder);
 void hg_runtime_record_worker(unsigned index, uint32_t elapsed_us);
+void hg_runtime_record_audio(uint32_t underruns, uint32_t write_errors);
 void hg_runtime_input_fault(void);
 void hg_input_capture_task(void *);
 void hg_sensor_worker_task(void *);
 void hg_network_worker_task(void *);
+void hg_audio_worker_task(void *);
 
 inline void hg_worker_delay(TickType_t *last, uint32_t period_ms) {
     TickType_t period = pdMS_TO_TICKS(period_ms);

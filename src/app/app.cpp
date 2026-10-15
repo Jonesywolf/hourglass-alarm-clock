@@ -15,6 +15,7 @@
 #include "hg/services/brightness.h"
 #include "hg/services/display_mode.h"
 #include "hg/services/effects.h"
+#include "hg/services/sound.h"
 #include "hg/services/store.h"
 #include "hg/services/time.h"
 #include "hg/services/wifi.h"
@@ -56,6 +57,20 @@ static void push_screens(const hg_network_snapshot_t *network,
     hg_weather_screen_update(&network->weather, &sensors->indoor);
 }
 
+static void sync_audio(hg_effects_snapshot_t *effects) {
+    if (!hg_runtime_audio_running()) {
+        return;
+    }
+    hg_audio_command_t command = {effects->generation, hg_sound_for_effects(effects)};
+    hg_runtime_set_audio_command(&command);
+    hg_audio_status_t audio;
+    if (hg_runtime_get_audio_status(&audio) && audio.generation == effects->generation &&
+        hg_effects_report_applied(effects->generation, effects->leds_active, audio.active,
+                                  effects->leds_starting)) {
+        hg_effects_get_snapshot(effects);
+    }
+}
+
 static void update_effects(uint32_t now) {
     hg_alarm_snapshot_t alarm;
     hg_alarm_get_snapshot(&alarm);
@@ -64,13 +79,11 @@ static void update_effects(uint32_t now) {
     hg_effects_update(now);
     hg_effects_snapshot_t effects;
     hg_effects_get_snapshot(&effects);
+    sync_audio(&effects);
+    hg_overlays_set_alarm(&alarm);
     hg_runtime_set_indoor_paused(effects.pause_indoor);
     hg_store_set_flash_allowed(!hg_navigator_is_sliding() && !effects.timing_sensitive &&
                                now - last_activity_ms >= HG_STORE_QUIET_MS);
-    if (alarm.ringing && hg_navigator_current() != HG_PAGE_CLOCK) {
-        hg_navigator_show_page(HG_PAGE_CLOCK);
-        hg_store_set_flash_allowed(false);
-    }
 }
 
 void hg_app_setup(void) {

@@ -21,7 +21,7 @@ static void hg_input_router_apply_encoder(int32_t delta) {
 
     hg_alarm_snapshot_t alarm;
     hg_alarm_get_snapshot(&alarm);
-    if (!alarm.enabled) {
+    if (!alarm.enabled || alarm.ringing || alarm.snoozed) {
         return;
     }
 
@@ -58,23 +58,37 @@ bool hg_input_router_update(bool navigation_allowed) {
         }
         activity = activity || event.tapped || event.encoder_pressed || event.encoder_delta != 0;
         bool allowed = navigation_allowed && event.generation == generation;
-        if (event.tapped) {
-            hg_alarm_snapshot_t alarm;
+        hg_alarm_snapshot_t alarm;
+        hg_alarm_get_snapshot(&alarm);
+        /* Alarm actions work during the boot overlay and slides, like dismissal always has. */
+        if (event.encoder_pressed && (alarm.ringing || alarm.snoozed)) {
+            HG_TOUCH_LOG("input", "encoder stop ringing=%d snoozed=%d\n",
+                         alarm.ringing ? 1 : 0, alarm.snoozed ? 1 : 0);
+            hg_alarm_dismiss();
+            hg_effects_set_alarm(false, false);
+            /* The stopping press must not also toggle the alarm off for tomorrow. */
+            pending_toggle = false;
+            pending_delta = 0;
+            event.encoder_pressed = false;
+            event.encoder_delta = 0;
             hg_alarm_get_snapshot(&alarm);
+        }
+        if (event.tapped) {
             HG_TOUCH_LOG("input", "tap action=%s page=%d nav=%d gen=%lu/%lu age=%lu ms\n",
-                         alarm.ringing ? "dismiss" : allowed ? "next" : "blocked",
+                         alarm.ringing ? "snooze" : allowed ? "next" : "blocked",
                          (int)hg_navigator_current(), navigation_allowed ? 1 : 0,
                          (unsigned long)event.generation, (unsigned long)generation,
                          (unsigned long)(millis() - event.captured_ms));
             if (alarm.ringing) {
-                hg_alarm_dismiss();
+                hg_alarm_snooze();
                 hg_effects_set_alarm(false, false);
             } else if (allowed) {
                 hg_navigator_next();
                 hg_effects_request_feedback(HG_FEEDBACK_NAVIGATE, millis());
             }
         }
-        if (allowed) {
+        /* Rotation edits the saved time; ignore it while ringing or snoozed. */
+        if (allowed && !alarm.ringing && !alarm.snoozed) {
             pending_toggle = pending_toggle != event.encoder_pressed;
             pending_delta = (pending_delta + event.encoder_delta % (24 * 60)) % (24 * 60);
         }
@@ -86,12 +100,17 @@ bool hg_input_router_update(bool navigation_allowed) {
 
     if (pending_toggle) {
         pending_toggle = false;
-        hg_alarm_snapshot_t alarm;
-        hg_alarm_get_snapshot(&alarm);
-        hg_alarm_set_enabled(!alarm.enabled);
-        hg_alarm_get_snapshot(&alarm);
-        hg_clock_screen_update_alarm(&alarm);
-        hg_effects_request_feedback(HG_FEEDBACK_ALARM_EDIT, millis());
+        if (hg_alarm_toggle_allowed(millis())) {
+            hg_alarm_snapshot_t alarm;
+            hg_alarm_get_snapshot(&alarm);
+            if (alarm.ringing || alarm.snoozed) {
+                return activity;
+            }
+            hg_alarm_set_enabled(!alarm.enabled);
+            hg_alarm_get_snapshot(&alarm);
+            hg_clock_screen_update_alarm(&alarm);
+            hg_effects_request_feedback(HG_FEEDBACK_ALARM_EDIT, millis());
+        }
     }
 
     hg_input_router_apply_encoder(pending_delta);

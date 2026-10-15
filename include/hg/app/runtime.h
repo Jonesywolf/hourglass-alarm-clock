@@ -2,6 +2,7 @@
 #define HG_APP_RUNTIME_H
 
 #include "hg/diagnostics.h"
+#include "hg/services/sound.h"
 #include "hg/types.h"
 
 typedef struct {
@@ -19,6 +20,21 @@ typedef struct {
     bool stale;
 } hg_network_snapshot_t;
 
+/* UI task -> audio worker. The generation is the effects-policy generation. */
+typedef struct {
+    uint32_t generation;
+    hg_sound_id_t sound;
+} hg_audio_command_t;
+
+/* Audio worker -> UI task. `active` describes the output for `generation`. */
+typedef struct {
+    uint32_t generation;
+    bool active;
+    uint32_t underruns;
+    uint32_t write_errors;
+    uint32_t updated_ms;
+} hg_audio_status_t;
+
 typedef struct {
     hg_timing_stats_t capture_gap;
     hg_timing_stats_t input_age;
@@ -28,8 +44,12 @@ typedef struct {
     uint32_t expired_inputs;
     uint32_t sensor_max_us;
     uint32_t network_max_us;
-    uint32_t stack_free_bytes[3];
+    /* input, sensor, network, audio (audio is 0 when no speaker) */
+    uint32_t stack_free_bytes[4];
     uint32_t input_queue_high_water;
+    /* Cumulative since boot; reset_diagnostics keeps them. */
+    uint32_t audio_underruns;
+    uint32_t audio_write_errors;
     bool touch_pressed;
     bool encoder_pressed;
     bool input_fault;
@@ -43,6 +63,10 @@ bool hg_runtime_take_input(hg_input_event_t *out);
 uint32_t hg_runtime_set_indoor_paused(bool paused);
 void hg_runtime_get_sensors(hg_sensor_snapshot_t *out);
 void hg_runtime_get_network(hg_network_snapshot_t *out);
+/* The audio worker exists only when the speaker initialized before hg_runtime_start(). */
+bool hg_runtime_audio_running(void);
+void hg_runtime_set_audio_command(const hg_audio_command_t *command);
+bool hg_runtime_get_audio_status(hg_audio_status_t *out);
 void hg_runtime_record_ui(uint32_t started_us, uint32_t elapsed_us, bool sliding);
 void hg_runtime_get_diagnostics(hg_runtime_diagnostics_t *out);
 void hg_runtime_reset_diagnostics(void);

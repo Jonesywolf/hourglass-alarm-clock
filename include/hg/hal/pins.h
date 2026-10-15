@@ -26,10 +26,10 @@
 #define HG_PIN_ENC_BTN       3   /* Active LOW with pullup */
 
 /* MAX98357A-class I2S amp (board may be marked MAX93857A). */
-#define HG_PIN_I2S_BCLK   (-1)
-#define HG_PIN_I2S_LRCLK  (-1)
-#define HG_PIN_I2S_DOUT   (-1)
-#define HG_PIN_I2S_SDMODE (-1)
+#define HG_PIN_I2S_BCLK      15   // Bit Clock (SCK)
+#define HG_PIN_I2S_LRCLK     16   // Word Select / Left-Right Clock (WS)
+#define HG_PIN_I2S_DOUT      17   // Serial Data Out (DIN)
+#define HG_PIN_I2S_SDMODE    18   // Software control for mute/shutdown
 
 #define HG_PIN_LED_STRIP  (-1)
 

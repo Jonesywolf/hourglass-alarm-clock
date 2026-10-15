@@ -18,6 +18,9 @@
   settings to make a test pass. An interrupted scratch test may need a specifically
   approved cleanup of that one test-owned key.
 - Do not interact with touch/encoder while automated input/timing tests run.
+- The alarm tests ring the real alarm and drive the I2S amp. `runtime-test` caps the
+  alarm volume at 1-2 % (`HG_ALARM_VOLUME_*_PCT` in `config.h`), so expect only a
+  faint beeping for a few seconds; do not raise it to pass a test.
 
 ## Commands
 
@@ -73,10 +76,16 @@ has been verified by it.
   expiry, navigation generations, stale/paused snapshots, save coalescing and
   older acknowledgements, save failure/retry/admission, navigation/encoder
   behavior, and alarm processing/dismissal during slides/the overlay.
+- `alarm_audio_tests.cpp`: sound-id mapping/availability, renderer ramp/loop/cap
+  limits (hardware-free), temporary snooze that never persists, encoder
+  stop-without-disabling with the post-dismiss lockout, and the real audio worker
+  (start, generation-matched ack, stop ack, underruns/errors, stack margin).
 - `stress_tests.cpp`: repeated rendered transitions at baseline and combined load.
   Sensor/network work is delayed by 250 ms; a separate core-0 task performs
   sustained CPU work with brief yields to emulate an output workload. Save
-  requests are coalesced while slides remain active.
+  requests are coalesced while slides remain active. A second pass repeats the
+  loaded transitions **while the alarm is playing** and also requires zero audio
+  underruns/write errors.
 - A separate scratch-NVS stress case performs actual writes after transitions
   become quiet, with combined worker/CPU load, and checks capture/frame gaps.
 - Test builds can hide the boot overlay so rendering is exercised even without
@@ -110,7 +119,7 @@ This is hardware regression evidence, not a new automated Unity case.
 Require the expected number of executed cases, **zero failures**, successful
 restoration, and actual timing samples. A reset/panic, watchdog message, silent
 serial timeout, ignored suite, or missing metrics is not a pass.
-The current suite contains 17 cases.
+The current suite contains 23 cases.
 
 1. **FRAME** reports complete rendered-frame gaps during slides, not average
    idle-loop time. Both baseline and loaded series must have more than 24 samples,
@@ -141,6 +150,15 @@ The current suite contains 17 cases.
 7. `Alarm save failed; retry pending` is intentional in the failure-injection
    case. That case must subsequently prove the request stayed pending and retried.
    Other errors require investigation; do not silence them or clear dirty state.
+8. **AUDIO** lines report start latency (ring to applied), stop-ack latency
+   (must be under 300 ms), underruns, write errors and audio-worker stack headroom
+   (above 256 bytes). Underruns and write errors must both be **zero**, in the idle
+   playback case and in the `AUDIO LOAD` case (alarm playing during the combined
+   load, which must also meet the FRAME max <= 50,000 us and CAPTURE <= 10,000 us
+   limits). `underruns` is inferred from refill gaps; a nonzero value means the DMA
+   ring could have run dry, so investigate core-0 contention or flash stalls instead
+   of enlarging limits. These tests prove the worker/I2S driver ran, not that the
+   speaker is audible or sounds right: confirm that by ear on the device.
 
 Unity can attribute an assertion's line to the suite's main file even when the
 test function is in another translation unit. Locate the named failing function
@@ -149,11 +167,11 @@ in the files above before interpreting the line number.
 Report the board/environment, test counts and exit code, baseline/loaded frame
 p95 and maximum, capture maximum, worker-delay evidence, stack margins, NVS
 results, and normal-firmware restoration. Separate measured responsiveness from
-subjective visual confirmation and from still-unimplemented LED/audio/AQI features.
+subjective visual confirmation and from still-unimplemented LED/AQI features.
 
-Actual audio/RMT integration must add checks for buffer underruns/transmission
-errors, memory/peripheral headroom, real device timing, and combined output load.
-The test suite does not yet drive an SK6812, speaker, or SEN66.
+Future RMT/LED integration must add checks for transmission errors, memory/peripheral
+headroom, real device timing, and combined output load (the audio checks above are
+the model). The test suite does not yet drive an SK6812 or SEN66.
 
 ## Reference measurement
 
