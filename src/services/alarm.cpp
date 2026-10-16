@@ -17,6 +17,7 @@ static uint32_t last_change_ms = 0;
 static bool fired_this_window = false;
 static bool acted = false;
 static uint32_t acted_ms = 0;
+static bool editing = false;
 
 static void hg_alarm_request_save(void) {
     hg_alarm_snapshot_t saved = {snapshot.enabled, false, base_hour, base_minute, false};
@@ -52,16 +53,13 @@ void hg_alarm_init(void) {
     dirty = false;
     fired_this_window = false;
     acted = false;
+    editing = false;
 }
 
-void hg_alarm_update(void) {
-    if (dirty && (millis() - last_change_ms >= HG_ALARM_STORE_DEBOUNCE_MS)) {
-        hg_alarm_request_save();
-        dirty = false;
+static void check_time(const hg_time_snapshot_t &time) {
+    if (editing) {
+        return;
     }
-
-    hg_time_snapshot_t time;
-    hg_time_get_snapshot(&time);
 
     if (!snapshot.enabled || !time.valid) {
         fired_this_window = false;
@@ -83,6 +81,22 @@ void hg_alarm_update(void) {
     HG_LOG("alarm", "ringing %02d:%02d\n", snapshot.hour, snapshot.minute);
 }
 
+void hg_alarm_update(void) {
+    if (dirty && (millis() - last_change_ms >= HG_ALARM_STORE_DEBOUNCE_MS)) {
+        hg_alarm_request_save();
+        dirty = false;
+    }
+    hg_time_snapshot_t time;
+    hg_time_get_snapshot(&time);
+    check_time(time);
+}
+
+#ifdef HG_RUNTIME_TEST
+void hg_alarm_test_check_time(const hg_time_snapshot_t *time) {
+    check_time(*time);
+}
+#endif
+
 void hg_alarm_get_snapshot(hg_alarm_snapshot_t *out) {
     if (out) {
         *out = snapshot;
@@ -95,6 +109,16 @@ void hg_alarm_set_time(int hour, int minute) {
     hg_alarm_restore_base();
     dirty = true;
     last_change_ms = millis();
+}
+
+void hg_alarm_set_editing(bool active) {
+    if (editing && !active) {
+        hg_time_snapshot_t time;
+        hg_time_get_snapshot(&time);
+        fired_this_window = time.valid && time.hour_24 == snapshot.hour &&
+                            time.minute == snapshot.minute;
+    }
+    editing = active;
 }
 
 void hg_alarm_set_enabled(bool enabled) {

@@ -20,6 +20,9 @@ void hg_input_capture_task(void *) {
     uint32_t last_overflow_ms = millis() - 1000U;
     uint32_t generation = 0;
     int32_t pending_delta = 0;
+    bool encoder_down = false;
+    bool touch_down = false;
+    uint32_t button_sequence = 0;
     for (;;) {
         uint32_t now_us = micros();
         hg_touch_update();
@@ -36,14 +39,30 @@ void hg_input_capture_task(void *) {
         int64_t sum = (int64_t)pending_delta + delta;
         pending_delta = sum > INT32_MAX ? INT32_MAX :
                         sum < INT32_MIN ? INT32_MIN : (int32_t)sum;
-        hg_input_event_t event = {millis(), generation, hg_touch_tapped(),
-                                  hg_encoder_button_pressed(), pending_delta};
-        if (!controls.navigation_allowed) {
-            pending_delta = 0;
-            event.encoder_delta = 0;
-            event.encoder_pressed = false;
+        bool next_encoder = hg_encoder_button_is_pressed();
+        bool next_touch = hg_touch_is_pressed();
+        bool encoder_changed = next_encoder != encoder_down;
+        if (encoder_changed) {
+            ++button_sequence;
         }
-        if (event.tapped || event.encoder_pressed || event.encoder_delta) {
+        hg_input_event_t event = {millis(), generation, hg_touch_tapped(),
+                                  hg_encoder_button_pressed(), pending_delta,
+                                  encoder_changed && !next_encoder,
+                                  touch_down && !next_touch, button_sequence};
+        encoder_down = next_encoder;
+        touch_down = next_touch;
+        hg_input_state_t state = {event.captured_ms, generation, button_sequence,
+                                  encoder_down, touch_down};
+        hg_runtime_capture_input_state(&state);
+        bool publish = true;
+#ifdef HG_RUNTIME_TEST
+        publish = !hg_runtime_manual_input();
+        if (!publish) {
+            pending_delta = 0;
+        }
+#endif
+        if (publish && (event.tapped || event.encoder_pressed || event.encoder_delta ||
+                        event.encoder_released || event.touch_released)) {
             if (hg_runtime_publish_input(&event)) {
                 pending_delta = 0;
             } else if (millis() - last_overflow_ms >= 1000U) {

@@ -7,6 +7,10 @@ static bool pause_for_leds = false;
 static bool feedback_seen = false;
 static uint32_t feedback_started_ms = 0;
 
+static bool alarm_cue(hg_feedback_t feedback) {
+    return feedback >= HG_FEEDBACK_ALARM_ENTER && feedback <= HG_FEEDBACK_ALARM_DISABLE;
+}
+
 static void refresh_resources(void) {
     state.pause_indoor = pause_for_leds && (state.leds_active || state.leds_starting);
     state.timing_sensitive = state.phase != HG_EFFECT_NORMAL || state.leds_starting ||
@@ -66,7 +70,12 @@ hg_feedback_result_t hg_effects_request_feedback(hg_feedback_t feedback, uint32_
     if (feedback == HG_FEEDBACK_NONE || (!state.led_available && !state.audio_available)) {
         return HG_FEEDBACK_UNAVAILABLE;
     }
-    if (feedback_seen && now_ms - feedback_started_ms < HG_FEEDBACK_INTERVAL_MS) {
+    bool cue = alarm_cue(feedback);
+    if (cue && !state.audio_available) {
+        return HG_FEEDBACK_UNAVAILABLE;
+    }
+    if (!cue && (alarm_cue(state.feedback) ||
+                 (feedback_seen && now_ms - feedback_started_ms < HG_FEEDBACK_INTERVAL_MS))) {
         return HG_FEEDBACK_RATE_LIMITED;
     }
     state.feedback = feedback;
@@ -79,7 +88,9 @@ hg_feedback_result_t hg_effects_request_feedback(hg_feedback_t feedback, uint32_
 
 void hg_effects_update(uint32_t now_ms) {
     if (state.feedback != HG_FEEDBACK_NONE &&
-        now_ms - feedback_started_ms >= HG_FEEDBACK_DURATION_MS) {
+        now_ms - feedback_started_ms >= (alarm_cue(state.feedback) ?
+                                         HG_CUE_FEEDBACK_DURATION_MS :
+                                         HG_FEEDBACK_DURATION_MS)) {
         stop_feedback();
     }
 }

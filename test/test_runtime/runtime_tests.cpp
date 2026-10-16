@@ -102,6 +102,7 @@ void test_app_startup(void) {
     if (hg_runtime_audio_running()) {
         TEST_ASSERT_GREATER_THAN_UINT32(256, diagnostics.stack_free_bytes[3]);
     }
+    hg_runtime_test_manual_input(true);
 }
 
 void test_input_queue_and_overlay_generation(void) {
@@ -256,8 +257,13 @@ void test_navigation_and_encoder_routing(void) {
     hg_alarm_snapshot_t alarm;
     hg_alarm_get_snapshot(&alarm);
     TEST_ASSERT_EQUAL(10, alarm.hour);
-    TEST_ASSERT_EQUAL(16, alarm.minute);
+    TEST_ASSERT_EQUAL(13, alarm.minute);
     event = {millis(), hg_runtime_input_generation(), false, true, 0};
+    TEST_ASSERT_TRUE(hg_runtime_test_input(&event));
+    hg_app_loop();
+    hg_alarm_get_snapshot(&alarm);
+    TEST_ASSERT_TRUE(alarm.enabled);
+    event = {millis(), hg_runtime_input_generation(), false, false, 0, true};
     TEST_ASSERT_TRUE(hg_runtime_test_input(&event));
     hg_app_loop();
     hg_alarm_get_snapshot(&alarm);
@@ -266,7 +272,7 @@ void test_navigation_and_encoder_routing(void) {
     TEST_ASSERT_TRUE(hg_runtime_test_input(&event));
     hg_app_loop();
     hg_alarm_get_snapshot(&alarm);
-    TEST_ASSERT_EQUAL(16, alarm.minute);
+    TEST_ASSERT_EQUAL(13, alarm.minute);
 }
 
 void test_alarm_during_slide_and_overlay(void) {

@@ -6,10 +6,39 @@
 #include "hg/services/sound.h"
 #include "runtime_internal.h"
 
+#ifdef HG_RUNTIME_TEST
+#include <atomic>
+static std::atomic<bool> fail_start(false);
+static std::atomic<bool> fail_write(false);
+
+void hg_runtime_test_audio_failure(bool start, bool write) {
+    fail_start.store(start);
+    fail_write.store(write);
+}
+#endif
+
 static int16_t chunk[HG_AUDIO_CHUNK_FRAMES];
 
 static bool start_playback(hg_sound_player_t *player, hg_sound_id_t sound) {
-    return hg_sound_player_start(player, sound, hg_speaker_sample_rate()) && hg_speaker_start();
+    if (!hg_sound_player_start(player, sound, hg_speaker_sample_rate())) {
+        return false;
+    }
+#ifdef HG_RUNTIME_TEST
+    if (fail_start.exchange(false)) {
+        return false;
+    }
+#endif
+    return hg_speaker_start();
+}
+
+static bool write_chunk(void) {
+#ifdef HG_RUNTIME_TEST
+    if (fail_write.exchange(false)) {
+        return false;
+    }
+#endif
+    return hg_speaker_write(chunk, HG_AUDIO_CHUNK_FRAMES,
+                            HG_AUDIO_WRITE_TIMEOUT_MS) == HG_AUDIO_CHUNK_FRAMES;
 }
 
 /* Owns the speaker after init. Acts only on the latest UI command, stops immediately when it
@@ -22,6 +51,7 @@ void hg_audio_worker_task(void *) {
     bool playing = false;
     bool retry_pending = false;
     uint32_t retry_at_ms = 0;
+    uint32_t drain_frames = 0;
     for (;;) {
         hg_audio_command_t latest;
         if (xQueuePeek(hg_audio_command_mailbox, &latest, 0) == pdTRUE &&
@@ -32,12 +62,19 @@ void hg_audio_worker_task(void *) {
                 playing = false;
             }
             retry_pending = false;
+            drain_frames = 0;
+#ifdef HG_RUNTIME_TEST
+            status.rendered_frames = status.drain_frames = status.start_attempts = 0;
+#endif
             if (hg_sound_available(desired.sound)) {
+#ifdef HG_RUNTIME_TEST
+                ++status.start_attempts;
+#endif
                 playing = start_playback(&player, desired.sound);
                 if (!playing) {
-                    retry_pending = true;
+                    retry_pending = player.loop;
                     retry_at_ms = millis() + HG_AUDIO_RETRY_MS;
-                    HG_ERROR("audio", "Speaker start failed; retry scheduled\n");
+                    HG_ERROR("audio", "Speaker start failed; looping sounds retry\n");
                 }
             }
             status.generation = desired.generation;
@@ -45,18 +82,38 @@ void hg_audio_worker_task(void *) {
 
         if (playing) {
             size_t frames = hg_sound_player_render(&player, chunk, HG_AUDIO_CHUNK_FRAMES);
-            if (frames == 0) {
+            bool draining = frames == 0;
+            if (draining && drain_frames >= HG_AUDIO_DRAIN_FRAMES) {
                 hg_speaker_stop();
                 playing = false;
-            } else if (hg_speaker_write(chunk, frames, HG_AUDIO_WRITE_TIMEOUT_MS) < frames) {
-                hg_speaker_stop();
-                playing = false;
-                retry_pending = player.loop;
-                retry_at_ms = millis() + HG_AUDIO_RETRY_MS;
-                HG_ERROR("audio", "Speaker write failed; stopped\n");
+            } else {
+                /* Flush the final samples through DMA before muting, checking commands
+                 * between chunks so replacement and alarm preemption remain prompt. */
+                for (size_t i = frames; i < HG_AUDIO_CHUNK_FRAMES; ++i) {
+                    chunk[i] = 0;
+                }
+                if (!write_chunk()) {
+                    hg_speaker_stop();
+                    playing = false;
+                    retry_pending = player.loop;
+                    retry_at_ms = millis() + HG_AUDIO_RETRY_MS;
+                    HG_ERROR("audio", "Speaker write failed; stopped\n");
+                } else if (draining) {
+                    drain_frames += HG_AUDIO_CHUNK_FRAMES;
+#ifdef HG_RUNTIME_TEST
+                    status.drain_frames = drain_frames;
+#endif
+                } else {
+#ifdef HG_RUNTIME_TEST
+                    status.rendered_frames += (uint32_t)frames;
+#endif
+                }
             }
         } else if (retry_pending && (int32_t)(millis() - retry_at_ms) >= 0) {
             retry_pending = false;
+#ifdef HG_RUNTIME_TEST
+            ++status.start_attempts;
+#endif
             playing = start_playback(&player, desired.sound);
             if (!playing) {
                 retry_pending = true;

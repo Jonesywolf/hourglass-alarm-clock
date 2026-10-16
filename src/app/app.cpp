@@ -52,6 +52,7 @@ static void push_screens(const hg_network_snapshot_t *network,
     hg_time_get_snapshot(&clock.time);
     clock.wifi = network->wifi;
     hg_alarm_get_snapshot(&clock.alarm);
+    hg_input_router_get_alarm_edit(&clock.alarm_edit);
     clock.display_active = hg_display_mode_get() != HG_DISPLAY_MODE_OFF;
     hg_clock_screen_update(&clock);
     hg_weather_screen_update(&network->weather, &sensors->indoor);
@@ -190,10 +191,22 @@ void hg_app_loop(void) {
     }
     bool navigation_allowed = !hg_boot_overlay_is_active();
     hg_runtime_set_navigation_allowed(navigation_allowed);
+    hg_alarm_edit_snapshot_t edit_before, edit_after;
+    hg_alarm_snapshot_t alarm_before, alarm_after;
+    hg_input_router_get_alarm_edit(&edit_before);
+    hg_alarm_get_snapshot(&alarm_before);
+    hg_display_mode_t display_before = hg_display_mode_get();
     if (hg_input_router_update(navigation_allowed)) {
         last_activity_ms = now;
         hg_store_set_flash_allowed(false);
     }
+    hg_input_router_get_alarm_edit(&edit_after);
+    hg_alarm_get_snapshot(&alarm_after);
+    ui_dirty = ui_dirty || edit_before.field != edit_after.field ||
+               edit_before.hour != edit_after.hour || edit_before.minute != edit_after.minute ||
+               alarm_before.enabled != alarm_after.enabled ||
+               alarm_before.hour != alarm_after.hour || alarm_before.minute != alarm_after.minute ||
+               display_before != hg_display_mode_get();
     hg_navigator_update();
     update_effects(now);
 

@@ -26,7 +26,30 @@ typedef struct {
     bool tapped;
     bool encoder_pressed;
     int32_t encoder_delta;
+    bool encoder_released;
+    bool touch_released;
+    uint32_t button_sequence;
 } hg_input_event_t;
+
+typedef struct {
+    uint32_t captured_ms;
+    uint32_t generation;
+    uint32_t button_sequence;
+    bool encoder_down;
+    bool touch_down;
+} hg_input_state_t;
+
+typedef enum {
+    HG_ALARM_EDIT_NONE = 0,
+    HG_ALARM_EDIT_MINUTE,
+    HG_ALARM_EDIT_HOUR
+} hg_alarm_edit_field_t;
+
+typedef struct {
+    hg_alarm_edit_field_t field;
+    int hour;
+    int minute;
+} hg_alarm_edit_snapshot_t;
 
 typedef enum {
     HG_PAGE_CLOCK = 0,
@@ -76,6 +99,7 @@ typedef struct {
     hg_wifi_snapshot_t wifi;
     hg_alarm_snapshot_t alarm;
     bool display_active;
+    hg_alarm_edit_snapshot_t alarm_edit;
 } hg_clock_snapshot_t;
 
 typedef struct {

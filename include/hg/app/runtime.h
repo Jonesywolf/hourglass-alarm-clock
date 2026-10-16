@@ -33,6 +33,11 @@ typedef struct {
     uint32_t underruns;
     uint32_t write_errors;
     uint32_t updated_ms;
+#ifdef HG_RUNTIME_TEST
+    uint32_t rendered_frames;
+    uint32_t drain_frames;
+    uint32_t start_attempts;
+#endif
 } hg_audio_status_t;
 
 typedef struct {
@@ -60,6 +65,8 @@ const char *hg_runtime_fault(void);
 void hg_runtime_set_navigation_allowed(bool allowed);
 uint32_t hg_runtime_input_generation(void);
 bool hg_runtime_take_input(hg_input_event_t *out);
+bool hg_runtime_take_input(hg_input_event_t *out, uint32_t now_ms);
+void hg_runtime_get_input_state(hg_input_state_t *out);
 uint32_t hg_runtime_set_indoor_paused(bool paused);
 void hg_runtime_get_sensors(hg_sensor_snapshot_t *out);
 void hg_runtime_get_network(hg_network_snapshot_t *out);
@@ -76,6 +83,8 @@ void hg_runtime_test_fail_worker(int index);
 void hg_runtime_test_load(uint32_t sensor_delay_ms, uint32_t network_delay_ms,
                           uint32_t network_busy_ms);
 bool hg_runtime_test_input(const hg_input_event_t *event);
+void hg_runtime_test_manual_input(bool manual);
+void hg_runtime_test_audio_failure(bool start, bool write);
 void hg_runtime_test_sensor_cache(const hg_sensor_snapshot_t *snapshot);
 #endif
 

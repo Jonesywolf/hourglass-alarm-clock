@@ -1,5 +1,6 @@
 #include "hg/ui/clock_screen.h"
 
+#include "hg/config.h"
 #include "hg/ui/fonts.h"
 #include "hg/ui/theme.h"
 
@@ -7,6 +8,11 @@ static lv_obj_t *clock_label;
 static lv_obj_t *meridiem_label;
 static lv_obj_t *wifi_label;
 static lv_obj_t *alarm_label;
+static lv_timer_t *alarm_blink_timer;
+static hg_alarm_snapshot_t shown_alarm;
+static hg_alarm_edit_snapshot_t shown_edit;
+static bool display_active = true;
+static bool blink_visible = true;
 static const lv_coord_t clock_meridiem_gap = 4;
 static hg_wifi_bars_t displayed_wifi_bars = HG_WIFI_BARS_NONE;
 static hg_wifi_bars_t pending_wifi_bars = HG_WIFI_BARS_NONE;
@@ -19,6 +25,43 @@ static const char *const wifi_icon_glyphs[] = {
     "\uEBE1",  // 3 bars
     "\uE1D8",  // 4 bars
 };
+
+static void render_alarm(void) {
+    if (!alarm_label) {
+        return;
+    }
+    bool editing = shown_edit.field != HG_ALARM_EDIT_NONE;
+    if (!display_active || (!shown_alarm.enabled && !editing)) {
+        lv_obj_add_flag(alarm_label, LV_OBJ_FLAG_HIDDEN);
+        return;
+    }
+    lv_obj_clear_flag(alarm_label, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_set_style_text_color(alarm_label, hg_theme_alarm(), 0);
+    int hour = editing ? shown_edit.hour : shown_alarm.hour;
+    int minute = editing ? shown_edit.minute : shown_alarm.minute;
+    int hour12 = hour % 12;
+    if (hour12 == 0) {
+        hour12 = 12;
+    }
+    char hours[24], minutes[24];
+    unsigned long hidden_color = lv_color_to32(hg_theme_bg()) & 0xffffffUL;
+    if (!blink_visible && shown_edit.field == HG_ALARM_EDIT_HOUR) {
+        lv_snprintf(hours, sizeof(hours), "#%06lx %d#", hidden_color, hour12);
+    } else {
+        lv_snprintf(hours, sizeof(hours), "%d", hour12);
+    }
+    if (!blink_visible && shown_edit.field == HG_ALARM_EDIT_MINUTE) {
+        lv_snprintf(minutes, sizeof(minutes), "#%06lx %02d#", hidden_color, minute);
+    } else {
+        lv_snprintf(minutes, sizeof(minutes), "%02d", minute);
+    }
+    lv_label_set_text_fmt(alarm_label, "%s:%s%s", hours, minutes, hour >= 12 ? "pm" : "am");
+}
+
+static void blink_alarm(lv_timer_t *) {
+    blink_visible = !blink_visible;
+    render_alarm();
+}
 
 static hg_wifi_bars_t hg_clock_clamp_wifi_bars(hg_wifi_bars_t bars) {
     if (bars > HG_WIFI_BARS_4) {
@@ -90,11 +133,18 @@ void hg_clock_screen_create(lv_obj_t *parent) {
     hg_clock_update_meridiem_position(false);
 
     alarm_label = lv_label_create(parent);
+    lv_label_set_recolor(alarm_label, true);
     lv_obj_set_style_text_font(alarm_label, HG_FONT_ALARM, 0);
     lv_obj_set_style_text_color(alarm_label, hg_theme_alarm(), 0);
     lv_label_set_text(alarm_label, "--:--");
     lv_obj_add_flag(alarm_label, LV_OBJ_FLAG_HIDDEN);
     lv_obj_align(alarm_label, LV_ALIGN_BOTTOM_LEFT, 10, -10);
+    shown_alarm = {};
+    shown_edit = {};
+    display_active = true;
+    blink_visible = true;
+    alarm_blink_timer = lv_timer_create(blink_alarm, HG_ALARM_EDIT_BLINK_MS, NULL);
+    lv_timer_pause(alarm_blink_timer);
 }
 
 void hg_clock_screen_update_alarm(const hg_alarm_snapshot_t *alarm) {
@@ -102,28 +152,27 @@ void hg_clock_screen_update_alarm(const hg_alarm_snapshot_t *alarm) {
         return;
     }
 
-    lv_obj_set_style_text_color(alarm_label, hg_theme_alarm(), 0);
-
-    if (alarm->enabled) {
-        lv_obj_clear_flag(alarm_label, LV_OBJ_FLAG_HIDDEN);
-    } else {
-        lv_obj_add_flag(alarm_label, LV_OBJ_FLAG_HIDDEN);
-        return;
-    }
-
-    char alarm_str[16];
-    int alarm_hour12 = alarm->hour % 12;
-    if (alarm_hour12 == 0) {
-        alarm_hour12 = 12;
-    }
-    lv_snprintf(alarm_str, sizeof(alarm_str), "%d:%02d%s", alarm_hour12, alarm->minute,
-                (alarm->hour >= 12) ? "pm" : "am");
-    lv_label_set_text(alarm_label, alarm_str);
+    shown_alarm = *alarm;
+    render_alarm();
 }
 
 void hg_clock_screen_update(const hg_clock_snapshot_t *snap) {
     if (!snap || !clock_label) {
         return;
+    }
+
+    bool edit_changed = shown_edit.field != snap->alarm_edit.field ||
+                        shown_edit.hour != snap->alarm_edit.hour ||
+                        shown_edit.minute != snap->alarm_edit.minute;
+    shown_edit = snap->alarm_edit;
+    display_active = snap->display_active;
+    if (shown_edit.field == HG_ALARM_EDIT_NONE) {
+        lv_timer_pause(alarm_blink_timer);
+        blink_visible = true;
+    } else if (edit_changed) {
+        blink_visible = true;
+        lv_timer_reset(alarm_blink_timer);
+        lv_timer_resume(alarm_blink_timer);
     }
 
     if (!snap->display_active) {
@@ -133,6 +182,7 @@ void hg_clock_screen_update(const hg_clock_snapshot_t *snap) {
         lv_obj_add_flag(alarm_label, LV_OBJ_FLAG_HIDDEN);
         return;
     }
+
     lv_obj_clear_flag(clock_label, LV_OBJ_FLAG_HIDDEN);
     lv_obj_clear_flag(meridiem_label, LV_OBJ_FLAG_HIDDEN);
     lv_obj_clear_flag(wifi_label, LV_OBJ_FLAG_HIDDEN);
@@ -196,3 +246,9 @@ void hg_clock_screen_update(const hg_clock_snapshot_t *snap) {
         hg_clock_set_wifi_icon(pending_wifi_bars, false);
     }
 }
+
+#ifdef HG_RUNTIME_TEST
+lv_obj_t *hg_clock_screen_test_alarm_label(void) {
+    return alarm_label;
+}
+#endif

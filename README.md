@@ -30,6 +30,8 @@ The overlay blocks ordinary navigation/editing but not alarm dismissal.
 - Input events carry capture time and a navigation generation. Expired/blocked
   input is discarded, not replayed after boot. Encoder movement is coalesced;
   overflow/expiry counters and authoritative pressed-state diagnostics are exposed.
+  Button transitions also carry a sequence, with a current-state handoff for
+  recovery: lost releases cancel gestures rather than leaving a stuck hold.
 - A sample's `valid` field means a last-good value exists, **not** that it is fresh.
   Inspect `status` and `sampled_ms`; distinguish waiting, ready, stale, paused,
   unavailable hardware, and acquisition error.
@@ -87,6 +89,53 @@ and CPU budgets, and merge any LED worker's applied state into the same
 
 ## Alarm and audio
 
+**Setting an alarm (clock page only):**
+
+- Hold the encoder button for one second to enter setting mode. The alarm can be
+  enabled or disabled; editing does not change that state. Minutes flash first.
+- Rotate for one-minute steps, carrying/borrowing hours and wrapping at midnight.
+  Short-press to alternate the flashing minutes/hours; hour steps preserve minutes
+  and cycle through all 24 hours, including the am/pm change.
+- Release the entry hold before pressing again. Another one-second hold saves,
+  or ten seconds without encoder activity saves automatically. Touch is ignored
+  and does not extend the editor timeout.
+- Alarm scheduling is suppressed while editing. Detents change only a draft;
+  only the committed time is sent through the existing asynchronous save path.
+  Saving a time matching the current minute does not ring immediately.
+- Outside editing, a short press on the clock page toggles alarm enabled on
+  **release**, not on button-down. Rotation does nothing yet; its clock-page
+  routing is reserved for future volume control. Other pages do not edit or
+  toggle the alarm with the encoder.
+
+**Quiet alarm feedback:**
+
+- Enter editing: a soft rounded tap; switch either field: a shorter, higher tap.
+- Hold-save and ten-second timeout-save: the same two-note warm confirmation.
+  This confirms the accepted time, even if unchanged, not completion of the
+  asynchronous flash write. Save failures still follow the logged retry path.
+- Enable: a higher warm chime; disable: a lower warm chime.
+- Detents, touch navigation, ignored inputs, wake-only gestures, snooze, and
+  dismissal remain silent. Consumed holds/releases do not produce extra cues.
+- The latest cue replaces the previous cue; no sound history is queued. Alarm
+  phases preempt feedback without replay. Ordinary silent feedback cannot cut
+  off an alarm-action cue, and real action cues bypass the ordinary rate limit.
+
+**Nighttime display and wake:**
+
+- At or below 5 lux the display becomes red; after 60 minutes it blanks the clock
+  labels. This is not backlight power-off. At or above 50 lux it returns to normal.
+  Intermediate light levels do not cancel the initial countdown.
+- Touch, encoder press, or rotation while off wakes into red mode. The first
+  interaction only wakes: it cannot navigate, toggle, or edit. A waking button
+  hold and its release are consumed; release and press again for another action.
+- After an input wake, one minute without further input returns to off. Further
+  interactions restart that timer, and a held input keeps the display awake.
+  Reaching 50 lux cancels temporary wake; a later dark transition gets the usual
+  initial 60-minute countdown.
+- An enabled alarm within 60 minutes, ringing, or snoozed prevents off mode.
+  Alarm stop/snooze controls therefore remain visible, including during the
+  temporary-wake timeout.
+
 **Interaction while the alarm rings** (`src/app/input_router.cpp` is the only place
 that interprets it; all of it works during slides and the boot overlay):
 
@@ -98,7 +147,8 @@ that interprets it; all of it works during slides and the boot overlay):
   ringing or snoozed.
 - The press that stops the alarm is consumed, and the enable toggle is ignored for
   `HG_ALARM_TOGGLE_LOCKOUT_MS` afterward, so mashing the knob cannot disable the
-  alarm. Idle behavior is unchanged: a press toggles enabled and saves it.
+  alarm. The entire stopping press/hold is consumed. Idle clock-page short presses
+  toggle enabled and save on release.
 - The alarm screen is a transient overlay (`ui/overlays.*`, LVGL top layer) with
   snooze/stop hints. After an action it briefly confirms "Snoozed until", "Next
   alarm" or "Alarm off".
@@ -111,15 +161,23 @@ applied; the UI feeds that into `hg_effects_report_applied()`. A stop is always
 acknowledged, which clears `stop_pending` and re-admits flash writes. While audio is
 active or stopping, effects are timing-sensitive, so flash writes are deferred.
 
-- `services/sound` is hardware-free: a descriptor table, a looping renderer, and the
+- `services/sound` is hardware-free: a descriptor table, looping PCM/finite tone rendering, and the
   volume ramp (`HG_ALARM_VOLUME_START_PCT` → `HG_ALARM_VOLUME_MAX_PCT` over
   `HG_ALARM_RAMP_MS`, measured in rendered audio frames, plus a short fade-in).
   Tune the cap on the device; automated test builds use 1-2 % so they stay quiet.
-- Only `HG_SOUND_ALARM` has a sample. `HG_SOUND_UI_NAVIGATE` / `HG_SOUND_UI_ALARM_EDIT`
-  are mapped from feedback but have no clip, so they render as silence. To add one,
-  embed a clip, add a descriptor row in `sound.cpp`, and nothing else changes.
+- The alarm uses the existing PCM clip. Five semantic alarm-action sounds are
+  synthesized from original tone descriptors in `services/sound`: rounded,
+  decaying taps and layered chimes with smooth attack/release, no pitch sweeps.
+  They last 40-182 ms and peak below `HG_UI_CUE_VOLUME_PCT` (2% full scale),
+  independently of the alarm ramp. No external recording or new dependency is
+  used. `HG_SOUND_UI_NAVIGATE` / `HG_SOUND_UI_ALARM_EDIT` remain silent.
+- Finite sounds pad their final chunk and flush bounded silence through the DMA
+  ring before muting. The worker checks commands between chunks during this drain,
+  so replacement and alarm interruption remain prompt. Semantic feedback has a
+  450 ms policy lifetime including playback/drain; ordinary feedback retains its
+  existing expiry. One-shot start/write failures are logged, not retried later.
 - The DMA ring is 6 × 256 frames (~96 ms, ~6 KB internal RAM). A write error or
-  timeout stops playback and retries after `HG_AUDIO_RETRY_MS`. `underruns` is
+  timeout stops playback; looping alarms retry after `HG_AUDIO_RETRY_MS`. `underruns` is
   inferred from refill gaps longer than the ring can cover; check it with
   `hg_runtime_get_diagnostics()` (cumulative, not cleared by reset).
 - A flash write already in flight when the alarm starts is covered by the DMA ring

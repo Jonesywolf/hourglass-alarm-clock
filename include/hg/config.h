@@ -25,6 +25,9 @@
 /* After a dismiss/snooze, an encoder press must not also toggle the alarm off. */
 #define HG_ALARM_TOGGLE_LOCKOUT_MS 2000U
 #define HG_ALARM_CONFIRM_MS 2500U
+#define HG_ENCODER_HOLD_MS 1000U
+#define HG_ALARM_EDIT_IDLE_MS 10000U
+#define HG_ALARM_EDIT_BLINK_MS 500U
 
 /* Alarm audio. The clip in src/services/sound_alarm_clip.cpp must use HG_AUDIO_SAMPLE_RATE. */
 #define HG_AUDIO_SAMPLE_RATE 16000U
@@ -33,6 +36,8 @@
 #define HG_AUDIO_WRITE_TIMEOUT_MS 100U
 #define HG_AUDIO_RETRY_MS 1000U
 #define HG_AUDIO_FADE_IN_MS 50U
+#define HG_UI_CUE_VOLUME_PCT 2
+#define HG_AUDIO_DRAIN_FRAMES ((HG_AUDIO_DMA_BUF_COUNT + 1U) * HG_AUDIO_CHUNK_FRAMES)
 #ifdef HG_RUNTIME_TEST
 /* Automated tests ring the alarm on real hardware; keep them quiet. */
 #define HG_ALARM_VOLUME_START_PCT 1
@@ -57,6 +62,7 @@
 #define HG_STORE_QUIET_MS 500U
 #define HG_FEEDBACK_DURATION_MS 150U
 #define HG_FEEDBACK_INTERVAL_MS 80U
+#define HG_CUE_FEEDBACK_DURATION_MS 450U
 
 /* ESP32-S3 Touch V2: counts rise when touched. Idle <30k, press >=33k. */
 #define HG_TOUCH_DEBOUNCE_MS 30U
@@ -71,6 +77,7 @@
 #define HG_DISPLAY_BRIGHT_LUX 50.0f
 
 #define HG_DISPLAY_RED_TO_OFF_MIN 60
+#define HG_DISPLAY_INPUT_WAKE_MS 60000U
 #define HG_DISPLAY_PRE_ALARM_MIN 60
 
 #endif

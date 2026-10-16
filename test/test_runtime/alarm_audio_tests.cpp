@@ -12,6 +12,7 @@
 #include "hg/services/store.h"
 #include "hg/services/time.h"
 #include "hg/ui/overlays.h"
+#include "hg/ui/navigator.h"
 
 static void run_app_ms(uint32_t duration_ms) {
     uint32_t started = millis();
@@ -22,6 +23,9 @@ static void run_app_ms(uint32_t duration_ms) {
 
 static void inject(bool tapped, bool pressed) {
     hg_input_event_t event = {millis(), hg_runtime_input_generation(), tapped, pressed, 0};
+    TEST_ASSERT_TRUE(hg_runtime_test_input(&event));
+    hg_app_loop();
+    event = {millis(), hg_runtime_input_generation(), false, false, 0, pressed, tapped};
     TEST_ASSERT_TRUE(hg_runtime_test_input(&event));
     hg_app_loop();
 }
@@ -93,6 +97,7 @@ void test_sound_ramp_loop_and_limits(void) {
         TEST_ASSERT_TRUE(gain <= cap + 0.0001f);
         previous = gain;
     }
+
     TEST_ASSERT_FLOAT_WITHIN(0.0001f, cap, hg_sound_gain_at(HG_SOUND_ALARM, ramp_frames, rate));
     TEST_ASSERT_FLOAT_WITHIN(0.0001f, cap, hg_sound_gain_at(HG_SOUND_ALARM, ramp_frames * 4U, rate));
     uint32_t after_fade = HG_AUDIO_FADE_IN_MS * (rate / 1000U);
@@ -123,6 +128,67 @@ void test_sound_ramp_loop_and_limits(void) {
     TEST_ASSERT_TRUE(wrapped);
     TEST_ASSERT_EQUAL_UINT32(rendered, player.elapsed);
     TEST_ASSERT_TRUE(peak <= (int32_t)(32768.0f * cap) + 1);
+}
+
+void test_alarm_cue_waveforms(void) {
+    static int16_t reference[HG_AUDIO_SAMPLE_RATE * 182U / 1000U];
+    const uint32_t durations[] = {80, 40, 182, 140, 140};
+    uint32_t hashes[5] = {};
+    for (unsigned cue = 0; cue < 5; ++cue) {
+        hg_sound_id_t id = (hg_sound_id_t)(HG_SOUND_ALARM_ENTER + cue);
+        hg_effects_snapshot_t effects = {};
+        effects.feedback = (hg_feedback_t)(HG_FEEDBACK_ALARM_ENTER + cue);
+        TEST_ASSERT_EQUAL(id, hg_sound_for_effects(&effects));
+        TEST_ASSERT_TRUE(hg_sound_available(id));
+        hg_sound_player_t player;
+        TEST_ASSERT_TRUE(hg_sound_player_start(&player, id, HG_AUDIO_SAMPLE_RATE));
+        TEST_ASSERT_FALSE(player.loop);
+        uint32_t expected = durations[cue] * HG_AUDIO_SAMPLE_RATE / 1000U;
+        TEST_ASSERT_EQUAL_UINT32(expected, player.frames);
+        TEST_ASSERT_EQUAL_UINT32(expected, hg_sound_player_render(&player, reference, expected));
+        TEST_ASSERT_TRUE(player.finished);
+        TEST_ASSERT_EQUAL_UINT32(0, hg_sound_player_render(&player, reference, 1));
+        TEST_ASSERT_EQUAL_INT16(0, reference[0]);
+        TEST_ASSERT_EQUAL_INT16(0, reference[expected - 1U]);
+        int32_t peak = 0;
+        int32_t tail_peak = 0;
+        uint32_t hash = 2166136261U;
+        for (uint32_t i = 0; i < expected; ++i) {
+            int32_t magnitude = abs((int)reference[i]);
+            if (magnitude > peak) {
+                peak = magnitude;
+            }
+            if (i >= expected - HG_AUDIO_SAMPLE_RATE * 8U / 1000U &&
+                magnitude > tail_peak) {
+                tail_peak = magnitude;
+            }
+            if (i > 0) {
+                TEST_ASSERT_LESS_OR_EQUAL(160, abs((int)reference[i] - reference[i - 1U]));
+            }
+            hash = (hash ^ (uint16_t)reference[i]) * 16777619U;
+            if (cue == 2 && i >= HG_AUDIO_SAMPLE_RATE * 70U / 1000U &&
+                i < HG_AUDIO_SAMPLE_RATE * 82U / 1000U) {
+                TEST_ASSERT_EQUAL_INT16(0, reference[i]);
+            }
+        }
+        TEST_ASSERT_GREATER_THAN(0, peak);
+        TEST_ASSERT_LESS_THAN(peak / 4, tail_peak);
+        TEST_ASSERT_LESS_OR_EQUAL(32767 * HG_UI_CUE_VOLUME_PCT / 100, peak);
+        hashes[cue] = hash;
+        for (unsigned j = 0; j < cue; ++j) {
+            TEST_ASSERT_NOT_EQUAL(hashes[j], hash);
+        }
+        TEST_ASSERT_TRUE(hg_sound_player_start(&player, id, HG_AUDIO_SAMPLE_RATE));
+        int16_t chunk[37];
+        uint32_t offset = 0;
+        while (!player.finished) {
+            size_t n = hg_sound_player_render(&player, chunk, 37);
+            TEST_ASSERT_GREATER_THAN_UINT32(0, n);
+            TEST_ASSERT_EQUAL_INT16_ARRAY(reference + offset, chunk, n);
+            offset += n;
+        }
+        TEST_ASSERT_EQUAL_UINT32(expected, offset);
+    }
 }
 
 void test_alarm_snooze_keeps_saved_time(void) {
@@ -194,6 +260,10 @@ void test_encoder_stops_alarm_without_disabling(void) {
     wait_overlay_gone();
 
     /* After the lockout the knob toggles the alarm as before. */
+    hg_navigator_show_page(HG_PAGE_CLOCK);
+    while (hg_navigator_is_sliding()) {
+        hg_app_loop();
+    }
     while (!hg_alarm_toggle_allowed(millis())) {
         hg_app_loop();
     }
@@ -278,4 +348,97 @@ void test_audio_worker_plays_acks_and_stops(void) {
     wait_overlay_gone();
     hg_alarm_dismiss();
     hg_alarm_set_enabled(false);
+}
+
+static void settle_audio(void) {
+    hg_alarm_dismiss();
+    hg_alarm_set_enabled(false);
+    hg_effects_cancel_feedback();
+    run_app_ms(HG_CUE_FEEDBACK_DURATION_MS + 100U);
+}
+
+static uint32_t request_cue(hg_feedback_t cue) {
+    TEST_ASSERT_EQUAL(HG_FEEDBACK_ACCEPTED, hg_effects_request_feedback(cue, millis()));
+    hg_effects_snapshot_t effects;
+    hg_effects_get_snapshot(&effects);
+    return effects.generation;
+}
+
+static hg_audio_status_t wait_audio(uint32_t generation, bool active) {
+    hg_audio_status_t status = {};
+    uint32_t started = millis();
+    while (millis() - started < 1000U) {
+        hg_app_loop();
+        if (hg_runtime_get_audio_status(&status) && status.generation == generation &&
+            status.active == active) {
+            return status;
+        }
+    }
+    TEST_FAIL_MESSAGE("audio worker did not apply expected generation/activity");
+    return status;
+}
+
+void test_audio_cue_completion_and_preemption(void) {
+    settle_audio();
+    hg_runtime_diagnostics_t before, after;
+    hg_runtime_get_diagnostics(&before);
+    uint32_t longest_completion = 0;
+    for (unsigned i = HG_FEEDBACK_ALARM_ENTER; i <= HG_FEEDBACK_ALARM_DISABLE; ++i) {
+        uint32_t started = millis();
+        uint32_t generation = request_cue((hg_feedback_t)i);
+        wait_audio(generation, true);
+        hg_audio_status_t status = wait_audio(generation, false);
+        uint32_t elapsed = millis() - started;
+        if (elapsed > longest_completion) {
+            longest_completion = elapsed;
+        }
+        const uint32_t lengths[] = {80, 40, 182, 140, 140};
+        uint32_t duration = lengths[i - HG_FEEDBACK_ALARM_ENTER];
+        TEST_ASSERT_EQUAL_UINT32(duration * HG_AUDIO_SAMPLE_RATE / 1000U,
+                                 status.rendered_frames);
+        TEST_ASSERT_GREATER_OR_EQUAL_UINT32(HG_AUDIO_DRAIN_FRAMES, status.drain_frames);
+        TEST_ASSERT_GREATER_OR_EQUAL_UINT32(duration, elapsed);
+        TEST_ASSERT_LESS_THAN_UINT32(HG_CUE_FEEDBACK_DURATION_MS, elapsed);
+    }
+    uint32_t first = request_cue(HG_FEEDBACK_ALARM_SAVE);
+    wait_audio(first, true);
+    uint32_t second = request_cue(HG_FEEDBACK_ALARM_FIELD);
+    TEST_ASSERT_NOT_EQUAL(first, second);
+    wait_audio(second, true);
+    uint32_t preempted = millis();
+    test_ring_alarm_now();
+    hg_app_loop();
+    hg_effects_snapshot_t effects;
+    hg_effects_get_snapshot(&effects);
+    wait_audio(effects.generation, true);
+    TEST_ASSERT_LESS_THAN_UINT32(300, millis() - preempted);
+    TEST_ASSERT_EQUAL(HG_SOUND_ALARM, hg_sound_for_effects(&effects));
+    TEST_ASSERT_EQUAL(HG_FEEDBACK_NONE, effects.feedback);
+    settle_audio();
+    hg_runtime_get_diagnostics(&after);
+    Serial.printf("CUE complete_max=%lums underruns=%lu errors=%lu\n",
+                  (unsigned long)longest_completion,
+                  (unsigned long)(after.audio_underruns - before.audio_underruns),
+                  (unsigned long)(after.audio_write_errors - before.audio_write_errors));
+    TEST_ASSERT_EQUAL_UINT32(before.audio_underruns, after.audio_underruns);
+    TEST_ASSERT_EQUAL_UINT32(before.audio_write_errors, after.audio_write_errors);
+}
+
+void test_audio_cue_failures_do_not_retry(void) {
+    settle_audio();
+    for (unsigned failure = 0; failure < 2; ++failure) {
+        hg_runtime_test_audio_failure(failure == 0, failure == 1);
+        uint32_t generation = request_cue(HG_FEEDBACK_ALARM_SAVE);
+        hg_audio_status_t status = wait_audio(generation, false);
+        TEST_ASSERT_EQUAL_UINT32(1, status.start_attempts);
+        TEST_ASSERT_EQUAL_UINT32(0, status.rendered_frames);
+        TEST_ASSERT_EQUAL_UINT32(0, status.drain_frames);
+        /* Leave the command unchanged past the retry deadline to detect stale replay. */
+        delay(HG_AUDIO_RETRY_MS + 100U);
+        TEST_ASSERT_TRUE(hg_runtime_get_audio_status(&status));
+        TEST_ASSERT_EQUAL_UINT32(generation, status.generation);
+        TEST_ASSERT_FALSE(status.active);
+        TEST_ASSERT_EQUAL_UINT32(1, status.start_attempts);
+        settle_audio();
+    }
 }

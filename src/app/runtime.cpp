@@ -33,10 +33,26 @@ static bool audio_running = false;
 static const char *startup_fault = nullptr;
 static uint32_t last_ui_us = 0;
 static bool ui_was_sliding = false;
+static hg_input_state_t captured_input;
 
 #ifdef HG_RUNTIME_TEST
 static int fail_worker = -1;
 static uint32_t sensor_load_ms = 0, network_load_ms = 0, busy_load_ms = 0;
+static bool manual_input = false;
+
+void hg_runtime_test_manual_input(bool manual) {
+    portENTER_CRITICAL(&mux);
+    manual_input = manual;
+    captured_input = {};
+    portEXIT_CRITICAL(&mux);
+}
+
+bool hg_runtime_manual_input(void) {
+    portENTER_CRITICAL(&mux);
+    bool result = manual_input;
+    portEXIT_CRITICAL(&mux);
+    return result;
+}
 
 void hg_runtime_test_fail_worker(int index) {
     fail_worker = index;
@@ -65,7 +81,22 @@ void hg_runtime_inject_load(bool sensor) {
 }
 
 bool hg_runtime_test_input(const hg_input_event_t *event) {
-    return hg_runtime_publish_input(event);
+    hg_input_event_t copy = *event;
+    portENTER_CRITICAL(&mux);
+    if (manual_input) {
+        captured_input.captured_ms = event->captured_ms;
+        captured_input.generation = event->generation;
+        if (event->encoder_pressed || event->encoder_released) {
+            ++captured_input.button_sequence;
+            captured_input.encoder_down = event->encoder_pressed;
+        }
+        if (event->tapped || event->touch_released) {
+            captured_input.touch_down = event->tapped;
+        }
+        copy.button_sequence = captured_input.button_sequence;
+    }
+    portEXIT_CRITICAL(&mux);
+    return hg_runtime_publish_input(&copy);
 }
 
 void hg_runtime_test_sensor_cache(const hg_sensor_snapshot_t *snapshot) {
@@ -80,6 +111,7 @@ bool hg_runtime_start(void) {
     }
     startup_fault = nullptr;
     controls = {1, 1, false, false};
+    captured_input = {};
     hg_input_queue = xQueueCreateStatic(HG_INPUT_QUEUE_CAPACITY, sizeof(hg_input_event_t),
                                         input_storage, &input_state);
     hg_sensor_mailbox = xQueueCreateStatic(1, sizeof(hg_sensor_snapshot_t),
@@ -262,11 +294,11 @@ bool hg_runtime_publish_input(const hg_input_event_t *event) {
     return sent;
 }
 
-bool hg_runtime_take_input(hg_input_event_t *out) {
+static bool take_input(hg_input_event_t *out, uint32_t now_ms, bool realtime) {
     if (xQueueReceive(hg_input_queue, out, 0) != pdTRUE) {
         return false;
     }
-    uint32_t age = millis() - out->captured_ms;
+    uint32_t age = (realtime ? millis() : now_ms) - out->captured_ms;
     portENTER_CRITICAL(&mux);
     hg_timing_record(&diagnostics.input_age, age > UINT32_MAX / 1000U ? UINT32_MAX : age * 1000U);
     if (age > HG_INPUT_MAX_AGE_MS) {
@@ -280,8 +312,36 @@ bool hg_runtime_take_input(hg_input_event_t *out) {
         out->tapped = false;
         out->encoder_pressed = false;
         out->encoder_delta = 0;
+        out->encoder_released = false;
+        out->touch_released = false;
     }
     return true;
+}
+
+bool hg_runtime_take_input(hg_input_event_t *out) {
+    return take_input(out, 0, true);
+}
+
+bool hg_runtime_take_input(hg_input_event_t *out, uint32_t now_ms) {
+    return take_input(out, now_ms, false);
+}
+
+void hg_runtime_capture_input_state(const hg_input_state_t *state) {
+    portENTER_CRITICAL(&mux);
+#ifdef HG_RUNTIME_TEST
+    if (!manual_input) {
+        captured_input = *state;
+    }
+#else
+    captured_input = *state;
+#endif
+    portEXIT_CRITICAL(&mux);
+}
+
+void hg_runtime_get_input_state(hg_input_state_t *out) {
+    portENTER_CRITICAL(&mux);
+    *out = captured_input;
+    portEXIT_CRITICAL(&mux);
 }
 
 void hg_runtime_record_capture(uint32_t gap_us, bool touch, bool encoder) {

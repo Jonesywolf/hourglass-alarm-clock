@@ -21,6 +21,8 @@
 - The alarm tests ring the real alarm and drive the I2S amp. `runtime-test` caps the
   alarm volume at 1-2 % (`HG_ALARM_VOLUME_*_PCT` in `config.h`), so expect only a
   faint beeping for a few seconds; do not raise it to pass a test.
+- Alarm interaction cues use a separate 2% full-scale cap. They also exercise the
+  real speaker; obtain permission for quiet cue playback as well as alarm tests.
 
 ## Commands
 
@@ -70,7 +72,8 @@ has been verified by it.
 
 - `effects_tests.cpp`: absent backends, ringing/sunrise precedence, feedback
   rejection/non-replay, wrap-safe expiry, cancellation generations/stop
-  acknowledgement, opt-in AQI policy, and timing histogram behavior.
+  acknowledgement, opt-in AQI policy, timing histogram behavior, and semantic
+  cue replacement inside the ordinary rate limit without detent cancellation.
 - `runtime_tests.cpp`: nonwaiting invalid time/RTC fallback, last-good brightness,
   worker-creation failure cleanup, startup/stack margins, queue saturation and
   expiry, navigation generations, stale/paused snapshots, save coalescing and
@@ -80,12 +83,34 @@ has been verified by it.
   limits (hardware-free), temporary snooze that never persists, encoder
   stop-without-disabling with the post-dismiss lockout, and the real audio worker
   (start, generation-matched ack, stop ack, underruns/errors, stack margin).
+  Cue cases verify five distinct finite waveforms, exact lengths, amplitude
+  caps, smooth/decaying edges, inter-note silence and chunk independence; real
+  worker cases verify complete DMA drain, replacement, alarm preemption and
+  one-shot start/write failures without retry. Injected worker failures log
+  `Speaker start failed` / `Speaker write failed`; those two logs are expected
+  only in the named failure test.
+- `alarm_edit_tests.cpp`: one-second entry/save thresholds, minutes/hours and
+  midnight carry/borrow, disabled-alarm draft editing, ten-second inactivity save,
+  ignored touch, scheduling suppression/current-minute commit, page/generation
+  isolation, lost-release recovery, timer wraparound, wake-only gestures,
+  nighttime timeouts/50-lux cancellation/alarm visibility guards, and selected
+  digit flashing with stable label width, whole-hold alarm dismissal during
+  blocked navigation, real-loop editor snapshot handoffs, and exact action-cue
+  identity/generations including unchanged-time timeout save. Separate cue checks
+  cover silent detents, ignored/blocked/stale/generation-invalid input, wake-only
+  holds/movement/touch, other pages, snooze and dismissal. Test-only logical input time avoids
+  waiting for long display timeouts; the real LVGL blink timer is also exercised.
+- Synthetic input uses an explicit manual source after startup. Hardware capture
+  and its timing/stack diagnostics continue running; physical input is not
+  replayed into synthetic gesture tests. Short presses include a release.
 - `stress_tests.cpp`: repeated rendered transitions at baseline and combined load.
   Sensor/network work is delayed by 250 ms; a separate core-0 task performs
   sustained CPU work with brief yields to emulate an output workload. Save
   requests are coalesced while slides remain active. A second pass repeats the
   loaded transitions **while the alarm is playing** and also requires zero audio
-  underruns/write errors.
+  underruns/write errors. Another pass repeatedly plays all five finite cues
+  under the same combined load, counts observed starts and drained completions,
+  and applies the same frame/capture/audio-error limits.
 - A separate scratch-NVS stress case performs actual writes after transitions
   become quiet, with combined worker/CPU load, and checks capture/frame gaps.
 - Test builds can hide the boot overlay so rendering is exercised even without
@@ -119,7 +144,7 @@ This is hardware regression evidence, not a new automated Unity case.
 Require the expected number of executed cases, **zero failures**, successful
 restoration, and actual timing samples. A reset/panic, watchdog message, silent
 serial timeout, ignored suite, or missing metrics is not a pass.
-The current suite contains 23 cases.
+The current suite contains 40 cases.
 
 1. **FRAME** reports complete rendered-frame gaps during slides, not average
    idle-loop time. Both baseline and loaded series must have more than 24 samples,
@@ -159,6 +184,14 @@ The current suite contains 23 cases.
    ring could have run dry, so investigate core-0 contention or flash stalls instead
    of enlarging limits. These tests prove the worker/I2S driver ran, not that the
    speaker is audible or sounds right: confirm that by ear on the device.
+9. `CUE` reports the longest finite completion latency and actual audio error
+   deltas. Every cue must complete before its 450 ms policy expiry, render exactly
+   its declared frames and flush at least `HG_AUDIO_DRAIN_FRAMES` of silence.
+   `CUE LOAD` must observe more than five starts and drained completions, more
+   than 24 frames, frame max <=50,000 us, capture <=10,000 us, zero overflows,
+   worker delays >200,000 us, zero underruns/write errors, and audio stack >256
+   bytes. Failure-injection checks leave a failed cue command unchanged beyond
+   the retry deadline; its start count must stay one.
 
 Unity can attribute an assertion's line to the suite's main file even when the
 test function is in another translation unit. Locate the named failing function
@@ -173,7 +206,80 @@ Future RMT/LED integration must add checks for transmission errors, memory/perip
 headroom, real device timing, and combined output load (the audio checks above are
 the model). The test suite does not yet drive an SK6812 or SEN66.
 
-## Reference measurement
+## Manual editor and nighttime checks
+
+After the automated suite restores normal firmware:
+
+- On the clock page, hold for one second and release. Only the alarm minutes
+  should flash. Rotate across an hour boundary, short-press to select hours,
+  check noon/midnight am/pm, then hold again to save.
+- Repeat with the alarm disabled: it must be visible during editing and remain
+  disabled after saving. Idle rotation must not change its time.
+- Touch while editing must not navigate or affect selection/save. Verify saving
+  after ten seconds without encoder activity and that the selected digits blink
+  without moving the colon or am/pm.
+- In nighttime off, separately try touch, rotation, a short encoder press, and a
+  held encoder press. Each first interaction must only wake the red display.
+  Release and interact again to navigate/toggle/edit.
+- Check the one-minute input-wake timeout, refresh by another interaction, and
+  cancellation when ambient light reaches 50 lux. Confirm an upcoming, ringing,
+  or snoozed alarm keeps the nighttime display visible.
+- Confirm physical alarm stop/snooze and audible playback separately from
+  synthetic input and I2S-worker tests. These checks do not replace the required
+  FRAME/CAPTURE/NVS/audio timing thresholds.
+- Listen for a soft entry tap, a shorter higher field tap (same either direction),
+  the complete two-note save chime on hold and timeout, a higher enable chime,
+  and a lower disable chime. Check unchanged-time save as well. Cues should be
+  quiet, rounded and restrained, not buzzy or arcade-like; no pitch sweeps.
+- Confirm detents/navigation/wake-only actions stay silent, consumed releases
+  do not double-play, rapid valid actions replace rather than queue sounds,
+  and alarm ringing immediately overrides feedback. Listening feedback and
+  adjustments must be recorded separately from automated passes.
+
+## Reference measurements
+
+The final rounded-tap/warm-chime implementation passed all 40 cases on the
+ESP32-S3 clock on COM4 (test exit 0; normal-firmware restoration exit 0).
+Baseline/loaded frame series each contained 96 samples with p95 33 ms and maxima
+32.376 / 32.486 ms. Baseline/loaded capture maxima were 5.499 / 5.485 ms;
+sensor/network worker maxima were 257.097 / 272.141 ms; input/sensor/network
+free stacks were 1,112 / 2,504 / 3,884 bytes. Audio start/stop acknowledgement
+was 43 / 5 ms. All five finite cues completed, longest 316 ms, including their
+full declared samples and DMA drain. Cue load observed 12 starts and 11 drained
+completions, 96 frames with p95 33 ms and maximum 33.052 ms, capture maximum
+5.503 ms, zero underruns/write errors, and 2,384 bytes audio stack free.
+Looping-alarm load had frame/capture maxima 32.782 / 5.493 ms and zero audio
+errors. Four scratch saves passed (longest 18.056 ms), with capture/frame maxima
+5.481 / 32.254 ms. Expected one-shot start/write failure injections did not retry.
+The user listened after restoration and confirmed the revised sound fits the
+minimalist clock; the earlier swept beeps were functional but rejected as too
+game-like. Off-state physical wake was not re-verified in this follow-up.
+
+Retained failure evidence: the first cue test run passed all audio cases but
+failed scratch-NVS capture timing (27.889 ms, against the unchanged 10 ms limit;
+longest write 120.065 ms). Cleanup and firmware restoration succeeded. An
+unchanged repeat passed all 40 cases with scratch capture 5.460 ms and longest
+write 22.057 ms. Both later sound-revision runs also met scratch timing; the first
+revision exposed an overly bright waveform in the adjacent-sample smoothness
+check, corrected by reducing upper partials rather than weakening that assertion.
+No NVS erasure, probe overwrite, or relaxed timing limit was used. This isolated
+long-write observation remains a flash-layout/latency caveat, not evidence that
+rare NVS stalls are solved by the audio change.
+
+The alarm-editor/input-wake implementation passed all 33 cases on the ESP32-S3
+clock on COM4 (test exit 0; normal-firmware restoration exit 0). Baseline and
+loaded frame series each contained 96 samples with p95 33 ms; their maxima were
+32.442 / 32.339 ms. Loaded capture maximum was 5.495 ms; sensor/network worker
+maxima were 257.068 / 271.262 ms. Input/sensor/network free stacks were
+1,288 / 2,504 / 3,884 bytes. With alarm audio and combined load, frame maximum
+was 32.733 ms and capture maximum 5.496 ms, with zero underruns/write errors and
+3,180 bytes of audio stack free. Audio start/stop-ack latency was 43 / 5 ms.
+Four scratch-NVS saves passed (longest 21.425 ms), with capture/frame maxima
+5.475 / 32.270 ms. Restored production firmware reported advancing touch scans,
+0 ms sample age, and zero timeouts. The user also confirmed the physical editor
+flow (hold, selected-field flashing, rotation, field switch, hold-save).
+Automated cases use synthetic gestures; physical off-state wake and subjective
+sound checks have not been separately confirmed for this build.
 
 The initial asynchronous-display implementation passed all 17 cases on the clock:
 baseline and loaded frame p95 were both 33 ms, loaded frame maximum was 32.408 ms,

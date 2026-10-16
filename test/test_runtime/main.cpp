@@ -28,9 +28,29 @@ void test_audio_worker_plays_acks_and_stops(void);
 void test_combined_load_frame_timing(void);
 void test_audio_playback_under_load(void);
 void test_real_nvs_admission_timing(void);
+void test_alarm_editor_fields_and_commit(void);
+void test_alarm_editor_touch_and_idle_save(void);
+void test_alarm_editor_suppression_and_matching_commit(void);
+void test_alarm_editor_page_and_generation_isolation(void);
+void test_alarm_editor_lost_release_and_wraparound(void);
+void test_nighttime_wake_gestures(void);
+void test_nighttime_timeouts_and_alarm_guard(void);
+void test_alarm_editor_flashing_presentation(void);
+void test_alarm_stop_consumes_hold_everywhere(void);
+void test_alarm_editor_app_snapshot_handoff(void);
+void test_alarm_cue_replacement_and_precedence(void);
+void test_alarm_cue_waveforms(void);
+void test_alarm_action_cues(void);
+void test_alarm_cues_ignore_consumed_input(void);
+void test_audio_cue_completion_and_preemption(void);
+void test_audio_cue_failures_do_not_retry(void);
+void test_audio_cues_under_load(void);
+void alarm_edit_test_cleanup(void);
 
 void setUp(void) {}
 void tearDown(void) {
+    alarm_edit_test_cleanup();
+    hg_runtime_test_audio_failure(false, false);
     hg_runtime_test_load(0, 0, 0);
     hg_store_set_flash_allowed(false);
 }
@@ -44,6 +64,7 @@ void setup(void) {
     RUN_TEST(test_alarm_preempts_feedback_without_replay);
     RUN_TEST(test_feedback_expiry_and_stop_generation);
     RUN_TEST(test_aqi_opt_in_and_applied_state);
+    RUN_TEST(test_alarm_cue_replacement_and_precedence);
     RUN_TEST(test_nonwaiting_time_and_fallback);
     RUN_TEST(test_brightness_keeps_last_good_classification);
     RUN_TEST(test_timing_percentiles);
@@ -55,13 +76,29 @@ void setup(void) {
     RUN_TEST(test_save_retry_and_admission);
     RUN_TEST(test_navigation_and_encoder_routing);
     RUN_TEST(test_alarm_during_slide_and_overlay);
+    RUN_TEST(test_alarm_editor_fields_and_commit);
+    RUN_TEST(test_alarm_editor_touch_and_idle_save);
+    RUN_TEST(test_alarm_editor_suppression_and_matching_commit);
+    RUN_TEST(test_alarm_editor_page_and_generation_isolation);
+    RUN_TEST(test_alarm_editor_lost_release_and_wraparound);
+    RUN_TEST(test_nighttime_wake_gestures);
+    RUN_TEST(test_nighttime_timeouts_and_alarm_guard);
+    RUN_TEST(test_alarm_editor_flashing_presentation);
+    RUN_TEST(test_alarm_stop_consumes_hold_everywhere);
+    RUN_TEST(test_alarm_editor_app_snapshot_handoff);
+    RUN_TEST(test_alarm_action_cues);
+    RUN_TEST(test_alarm_cues_ignore_consumed_input);
     RUN_TEST(test_sound_mapping_and_availability);
     RUN_TEST(test_sound_ramp_loop_and_limits);
+    RUN_TEST(test_alarm_cue_waveforms);
     RUN_TEST(test_alarm_snooze_keeps_saved_time);
     RUN_TEST(test_encoder_stops_alarm_without_disabling);
     RUN_TEST(test_audio_worker_plays_acks_and_stops);
+    RUN_TEST(test_audio_cue_completion_and_preemption);
+    RUN_TEST(test_audio_cue_failures_do_not_retry);
     RUN_TEST(test_combined_load_frame_timing);
     RUN_TEST(test_audio_playback_under_load);
+    RUN_TEST(test_audio_cues_under_load);
     RUN_TEST(test_real_nvs_admission_timing);
     UNITY_END();
 }

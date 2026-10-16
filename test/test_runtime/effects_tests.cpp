@@ -106,7 +106,61 @@ void test_timing_percentiles(void) {
     for (unsigned i = 1; i <= 100; ++i) {
         hg_timing_record(&stats, i * 1000U);
     }
+
     TEST_ASSERT_EQUAL_UINT32(50000, hg_timing_percentile_us(&stats, 50));
     TEST_ASSERT_EQUAL_UINT32(100000, hg_timing_percentile_us(&stats, 95));
     TEST_ASSERT_EQUAL_UINT32(100000, stats.max_us);
+}
+
+void test_alarm_cue_replacement_and_precedence(void) {
+    hg_effects_init();
+    hg_effects_set_capabilities(true, false);
+    TEST_ASSERT_EQUAL(HG_FEEDBACK_UNAVAILABLE,
+                      hg_effects_request_feedback(HG_FEEDBACK_ALARM_ENTER, 0));
+    hg_effects_set_capabilities(true, true);
+    uint32_t start = UINT32_MAX - 100U;
+    TEST_ASSERT_EQUAL(HG_FEEDBACK_ACCEPTED,
+                      hg_effects_request_feedback(HG_FEEDBACK_NAVIGATE, start));
+    hg_effects_snapshot_t state;
+    for (unsigned i = HG_FEEDBACK_ALARM_ENTER; i <= HG_FEEDBACK_ALARM_DISABLE; ++i) {
+        hg_effects_get_snapshot(&state);
+        uint32_t previous = state.generation;
+        TEST_ASSERT_EQUAL(HG_FEEDBACK_ACCEPTED,
+                          hg_effects_request_feedback((hg_feedback_t)i, ++start));
+        hg_effects_get_snapshot(&state);
+        TEST_ASSERT_EQUAL_UINT32(previous + 1U, state.generation);
+        TEST_ASSERT_EQUAL(i, state.feedback);
+    }
+    TEST_ASSERT_EQUAL(HG_FEEDBACK_ACCEPTED,
+                      hg_effects_request_feedback(HG_FEEDBACK_ALARM_DISABLE, ++start));
+    hg_effects_get_snapshot(&state);
+    uint32_t generation = state.generation;
+    TEST_ASSERT_EQUAL(HG_FEEDBACK_RATE_LIMITED,
+                      hg_effects_request_feedback(HG_FEEDBACK_ALARM_EDIT, start + 100U));
+    TEST_ASSERT_EQUAL(HG_FEEDBACK_RATE_LIMITED,
+                      hg_effects_request_feedback(HG_FEEDBACK_NAVIGATE, start + 101U));
+    hg_effects_update(start + HG_CUE_FEEDBACK_DURATION_MS - 1U);
+    hg_effects_get_snapshot(&state);
+    TEST_ASSERT_EQUAL_UINT32(generation, state.generation);
+    hg_effects_update(start + HG_CUE_FEEDBACK_DURATION_MS);
+    hg_effects_get_snapshot(&state);
+    TEST_ASSERT_TRUE(state.stop_pending);
+    TEST_ASSERT_EQUAL(HG_FEEDBACK_PREEMPTED,
+                      hg_effects_request_feedback(HG_FEEDBACK_ALARM_SAVE,
+                                                   start + HG_CUE_FEEDBACK_DURATION_MS));
+    TEST_ASSERT_TRUE(hg_effects_report_applied(state.generation, false, false, false));
+    TEST_ASSERT_EQUAL(HG_FEEDBACK_ACCEPTED,
+                      hg_effects_request_feedback(HG_FEEDBACK_ALARM_SAVE,
+                                                   start + HG_CUE_FEEDBACK_DURATION_MS + 1U));
+    hg_effects_set_alarm(false, true);
+    TEST_ASSERT_EQUAL(HG_FEEDBACK_PREEMPTED,
+                      hg_effects_request_feedback(HG_FEEDBACK_ALARM_ENABLE,
+                                                   start + HG_CUE_FEEDBACK_DURATION_MS + 2U));
+    hg_effects_set_alarm(false, false);
+    hg_effects_get_snapshot(&state);
+    TEST_ASSERT_EQUAL(HG_FEEDBACK_NONE, state.feedback);
+    TEST_ASSERT_TRUE(hg_effects_report_applied(state.generation, false, false, false));
+    hg_effects_update(start + 2000U);
+    hg_effects_get_snapshot(&state);
+    TEST_ASSERT_EQUAL(HG_FEEDBACK_NONE, state.feedback);
 }
