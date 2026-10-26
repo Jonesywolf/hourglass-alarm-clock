@@ -247,9 +247,15 @@ void test_volume_scaled_pcm_and_unchanged_cues(void) {
 
 void test_volume_panel_animation_and_cancellation(void) {
     begin();
+    hg_volume_snapshot_t hidden = {};
+    hidden.dismiss_immediately = true;
+    hg_overlays_set_volume(&hidden);
     turn(-1);
     hg_volume_snapshot_t snap = volume();
+    lv_timer_t *refresh = _lv_disp_get_refr_timer(lv_disp_get_default());
+    lv_timer_reset(refresh);
     hg_overlays_set_volume(&snap);
+    TEST_ASSERT_GREATER_OR_EQUAL_UINT32(refresh->period, lv_tick_elaps(refresh->last_run));
     int x, value;
     TEST_ASSERT_TRUE(hg_overlays_test_volume(&x, &value));
     TEST_ASSERT_EQUAL(70, value);

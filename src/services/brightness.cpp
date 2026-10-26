@@ -4,10 +4,12 @@
 #include "hg/hal/display.h"
 
 static uint8_t percent = 100;
+static bool display_active = true;
 static hg_light_level_t light_level = HG_LIGHT_NEUTRAL;
 
 void hg_brightness_init(void) {
     percent = 100;
+    display_active = true;
     light_level = HG_LIGHT_NEUTRAL;
     hg_display_set_brightness(percent);
 }
@@ -23,7 +25,12 @@ void hg_brightness_update(const hg_light_snapshot_t *light) {
             light_level = HG_LIGHT_NEUTRAL;
         }
     }
-    hg_display_set_brightness(percent);
+    hg_display_set_brightness(display_active ? percent : 0);
+}
+
+void hg_brightness_set_display_active(bool active) {
+    display_active = active;
+    hg_display_set_brightness(display_active ? percent : 0);
 }
 
 hg_light_level_t hg_brightness_get_light_level(void) {

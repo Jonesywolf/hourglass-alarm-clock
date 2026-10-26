@@ -40,15 +40,24 @@ typedef struct {
 } hg_input_state_t;
 
 typedef enum {
+    HG_ALARM_SOUND_MALLETS = 0,
+    HG_ALARM_SOUND_WOODEN,
+    HG_ALARM_SOUND_PLUCKED,
+    HG_ALARM_SOUND_COUNT
+} hg_alarm_sound_t;
+
+typedef enum {
     HG_ALARM_EDIT_NONE = 0,
     HG_ALARM_EDIT_MINUTE,
-    HG_ALARM_EDIT_HOUR
+    HG_ALARM_EDIT_HOUR,
+    HG_ALARM_EDIT_SOUND
 } hg_alarm_edit_field_t;
 
 typedef struct {
     hg_alarm_edit_field_t field;
     int hour;
     int minute;
+    hg_alarm_sound_t sound;
 } hg_alarm_edit_snapshot_t;
 
 typedef struct {
@@ -99,6 +108,7 @@ typedef struct {
     /* While snoozed, hour/minute are the temporary ring time; the saved time is restored on dismiss. */
     bool snoozed;
     uint8_t volume_pct;
+    hg_alarm_sound_t sound;
 } hg_alarm_snapshot_t;
 
 typedef struct {

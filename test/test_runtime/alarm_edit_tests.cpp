@@ -1,5 +1,6 @@
 #include <Arduino.h>
 #include <cstring>
+#include <climits>
 #include <unity.h>
 
 #include "hg/app.h"
@@ -7,6 +8,7 @@
 #include "hg/app/runtime.h"
 #include "hg/config.h"
 #include "hg/hal/display.h"
+#include "hg/hal/pins.h"
 #include "hg/services/alarm.h"
 #include "hg/services/brightness.h"
 #include "hg/services/display_mode.h"
@@ -16,9 +18,13 @@
 #include "hg/services/time.h"
 #include "hg/ui/clock_screen.h"
 #include "hg/ui/navigator.h"
+#include "hg/ui/theme.h"
+#include "hg/ui/fonts.h"
 
 static uint32_t now_ms;
 static bool active = false;
+static hg_effects_snapshot_t feedback(void);
+static void reset_feedback(void);
 
 static hg_alarm_edit_snapshot_t editor(void) {
     hg_alarm_edit_snapshot_t value;
@@ -105,6 +111,8 @@ void test_alarm_editor_fields_and_commit(void) {
     TEST_ASSERT_EQUAL(58, editor().minute);
     step(1, false, false, -26);
     TEST_ASSERT_EQUAL(23, editor().hour);
+    short_press();
+    TEST_ASSERT_EQUAL(HG_ALARM_EDIT_SOUND, editor().field);
     short_press();
     TEST_ASSERT_EQUAL(HG_ALARM_EDIT_MINUTE, editor().field);
     step(1, false, false, 7);
@@ -268,6 +276,9 @@ static void enter_off(void) {
     now_ms += (uint32_t)HG_DISPLAY_RED_TO_OFF_MIN * 60000U;
     hg_display_mode_update(now_ms);
     TEST_ASSERT_EQUAL(HG_DISPLAY_MODE_OFF, hg_display_mode_get());
+    TEST_ASSERT_EQUAL(LOW, digitalRead(HG_PIN_TFT_BL));
+    set_lux(1.0f);
+    TEST_ASSERT_EQUAL(LOW, digitalRead(HG_PIN_TFT_BL));
 }
 
 void test_nighttime_wake_gestures(void) {
@@ -275,6 +286,7 @@ void test_nighttime_wake_gestures(void) {
     enter_off();
     hold();
     TEST_ASSERT_EQUAL(HG_DISPLAY_MODE_RED, hg_display_mode_get());
+    TEST_ASSERT_EQUAL(HIGH, digitalRead(HG_PIN_TFT_BL));
     TEST_ASSERT_EQUAL(HG_ALARM_EDIT_NONE, editor().field);
     step(1, false, true);
     TEST_ASSERT_FALSE(alarm().enabled);
@@ -288,6 +300,7 @@ void test_nighttime_wake_gestures(void) {
     int volume_before_wake = alarm().volume_pct;
     step(1, false, false, 10);
     TEST_ASSERT_EQUAL(HG_DISPLAY_MODE_RED, hg_display_mode_get());
+    TEST_ASSERT_EQUAL(HIGH, digitalRead(HG_PIN_TFT_BL));
     TEST_ASSERT_EQUAL(59, alarm().minute);
     TEST_ASSERT_EQUAL(HG_ALARM_EDIT_NONE, editor().field);
     TEST_ASSERT_EQUAL(volume_before_wake, alarm().volume_pct);
@@ -298,6 +311,7 @@ void test_nighttime_wake_gestures(void) {
     enter_off();
     step(1, false, false, 0, true);
     TEST_ASSERT_EQUAL(HG_DISPLAY_MODE_RED, hg_display_mode_get());
+    TEST_ASSERT_EQUAL(HIGH, digitalRead(HG_PIN_TFT_BL));
     TEST_ASSERT_EQUAL(HG_PAGE_CLOCK, hg_navigator_current());
     step(1, false, false, 0, false, true);
     step(1, false, false, 0, true);
@@ -315,7 +329,9 @@ void test_nighttime_timeouts_and_alarm_guard(void) {
     TEST_ASSERT_EQUAL(HG_DISPLAY_MODE_RED, hg_display_mode_get());
     hg_display_mode_update(++now_ms);
     TEST_ASSERT_EQUAL(HG_DISPLAY_MODE_OFF, hg_display_mode_get());
+    TEST_ASSERT_EQUAL(LOW, digitalRead(HG_PIN_TFT_BL));
     TEST_ASSERT_TRUE(hg_display_mode_note_activity(now_ms));
+    TEST_ASSERT_EQUAL(HIGH, digitalRead(HG_PIN_TFT_BL));
     now_ms += HG_DISPLAY_INPUT_WAKE_MS - 1;
     hg_display_mode_update(now_ms);
     TEST_ASSERT_EQUAL(HG_DISPLAY_MODE_RED, hg_display_mode_get());
@@ -362,6 +378,21 @@ void test_nighttime_timeouts_and_alarm_guard(void) {
     TEST_ASSERT_EQUAL(HG_DISPLAY_MODE_RED, hg_display_mode_get());
     hg_display_mode_update(++now_ms);
     TEST_ASSERT_EQUAL(HG_DISPLAY_MODE_OFF, hg_display_mode_get());
+    TEST_ASSERT_EQUAL(LOW, digitalRead(HG_PIN_TFT_BL));
+
+    set_lux(50.0f);
+    TEST_ASSERT_EQUAL(LOW, digitalRead(HG_PIN_TFT_BL));
+    hg_display_mode_update(++now_ms);
+    TEST_ASSERT_EQUAL(HG_DISPLAY_MODE_NORMAL, hg_display_mode_get());
+    TEST_ASSERT_EQUAL(HIGH, digitalRead(HG_PIN_TFT_BL));
+
+    enter_off();
+    hg_time_get_snapshot(&time);
+    hg_alarm_set_time(time.hour_24, time.minute);
+    hg_alarm_set_enabled(true);
+    hg_display_mode_update(++now_ms);
+    TEST_ASSERT_EQUAL(HG_DISPLAY_MODE_RED, hg_display_mode_get());
+    TEST_ASSERT_EQUAL(HIGH, digitalRead(HG_PIN_TFT_BL));
 }
 
 void test_alarm_editor_flashing_presentation(void) {
@@ -402,6 +433,84 @@ void test_alarm_editor_flashing_presentation(void) {
     snap.alarm_edit.field = HG_ALARM_EDIT_NONE;
     hg_clock_screen_update(&snap);
     TEST_ASSERT_TRUE(lv_obj_has_flag(label, LV_OBJ_FLAG_HIDDEN));
+}
+
+void test_alarm_sound_editor_and_presentation(void) {
+    begin();
+    hg_alarm_commit_edit(23, 59, HG_ALARM_SOUND_MALLETS);
+    hold();
+    step(1, false, true);
+    short_press();
+    short_press();
+    TEST_ASSERT_EQUAL(HG_ALARM_EDIT_SOUND, editor().field);
+    reset_feedback();
+    step(1, false, false, -1);
+    TEST_ASSERT_EQUAL(HG_ALARM_SOUND_PLUCKED, editor().sound);
+    TEST_ASSERT_EQUAL(HG_ALARM_SOUND_MALLETS, alarm().sound);
+    TEST_ASSERT_EQUAL(HG_FEEDBACK_NONE, feedback().feedback);
+    step(1, false, false, INT32_MAX);
+    TEST_ASSERT_EQUAL(HG_ALARM_SOUND_MALLETS, editor().sound);
+    step(1, false, false, INT32_MIN);
+    TEST_ASSERT_EQUAL(HG_ALARM_SOUND_WOODEN, editor().sound);
+    TEST_ASSERT_EQUAL(23, editor().hour);
+    TEST_ASSERT_EQUAL(59, editor().minute);
+    hg_alarm_snapshot_t value = alarm();
+    uint8_t volume = value.volume_pct;
+    step(1, false, false, 1);
+    TEST_ASSERT_EQUAL(HG_ALARM_SOUND_PLUCKED, editor().sound);
+    TEST_ASSERT_EQUAL(volume, alarm().volume_pct);
+    hg_clock_snapshot_t snap = {};
+    snap.display_active = true;
+    snap.alarm = value;
+    snap.alarm_edit = editor();
+    hg_clock_screen_update(&snap);
+    lv_obj_t *label = hg_clock_screen_test_sound_label();
+    lv_obj_t *icon = hg_clock_screen_test_sound_icon();
+    TEST_ASSERT_EQUAL_STRING(HG_ICON_MUSIC_NOTE, lv_label_get_text(icon));
+    TEST_ASSERT_FALSE(lv_obj_has_flag(icon, LV_OBJ_FLAG_HIDDEN));
+    TEST_ASSERT_FALSE(lv_obj_has_flag(icon, LV_OBJ_FLAG_CLICKABLE));
+    lv_font_glyph_dsc_t glyph;
+    TEST_ASSERT_TRUE(lv_font_get_glyph_dsc(HG_FONT_SOUND_ICON, &glyph, 0xE405, 0));
+    TEST_ASSERT_FALSE(lv_obj_has_flag(label, LV_OBJ_FLAG_HIDDEN));
+    TEST_ASSERT_EQUAL_STRING("Plucked dawn", lv_label_get_text(label));
+    lv_obj_update_layout(label);
+    lv_area_t sound_area, time_area;
+    lv_obj_get_coords(label, &sound_area);
+    lv_area_t icon_area;
+    lv_obj_get_coords(icon, &icon_area);
+    TEST_ASSERT_TRUE(icon_area.x2 < sound_area.x1);
+    lv_obj_get_coords(hg_clock_screen_test_alarm_label(), &time_area);
+    TEST_ASSERT_TRUE(sound_area.x1 > time_area.x2 || sound_area.y2 < time_area.y1);
+    TEST_ASSERT_TRUE(sound_area.x1 >= 0 && sound_area.x2 < lv_disp_get_hor_res(nullptr));
+    uint32_t started = millis();
+    while (millis() - started < HG_ALARM_EDIT_BLINK_MS + 20U) {
+        hg_display_poll();
+        lv_timer_handler();
+        delay(1);
+    }
+    TEST_ASSERT_EQUAL(lv_color_to32(hg_theme_bg()),
+                      lv_color_to32(lv_obj_get_style_text_color(label, 0)));
+    TEST_ASSERT_EQUAL(lv_color_to32(hg_theme_bg()),
+                      lv_color_to32(lv_obj_get_style_text_color(icon, 0)));
+    hold();
+    step(1, false, true);
+    TEST_ASSERT_EQUAL(HG_ALARM_SOUND_PLUCKED, alarm().sound);
+    TEST_ASSERT_EQUAL(HG_ALARM_EDIT_NONE, editor().field);
+    snap.alarm_edit = editor();
+    hg_clock_screen_update(&snap);
+    TEST_ASSERT_TRUE(lv_obj_has_flag(label, LV_OBJ_FLAG_HIDDEN));
+    TEST_ASSERT_TRUE(lv_obj_has_flag(icon, LV_OBJ_FLAG_HIDDEN));
+    hold();
+    step(1, false, true);
+    short_press();
+    short_press();
+    TEST_ASSERT_EQUAL(HG_ALARM_SOUND_PLUCKED, editor().sound);
+    step(1, false, false, 1);
+    step(HG_ALARM_EDIT_IDLE_MS - 1);
+    TEST_ASSERT_EQUAL(HG_ALARM_SOUND_PLUCKED, alarm().sound);
+    step(1);
+    TEST_ASSERT_EQUAL(HG_ALARM_SOUND_MALLETS, alarm().sound);
+    hg_alarm_commit_edit(23, 59, HG_ALARM_SOUND_MALLETS);
 }
 
 void test_alarm_stop_consumes_hold_everywhere(void) {
@@ -456,14 +565,29 @@ void test_alarm_editor_app_snapshot_handoff(void) {
     TEST_ASSERT_EQUAL_STRING("12:01am", lv_label_get_text(label));
     TEST_ASSERT_EQUAL(23, alarm().hour);
     TEST_ASSERT_EQUAL(59, alarm().minute);
+    app_event(true);
+    app_event(false, true);
+    app_event(true);
+    app_event(false, true);
+    TEST_ASSERT_EQUAL(HG_ALARM_EDIT_SOUND, editor().field);
+    hg_alarm_sound_t original_sound = alarm().sound;
+    app_event(false, false, 1);
+    TEST_ASSERT_EQUAL((original_sound + 1) % HG_ALARM_SOUND_COUNT, editor().sound);
+    TEST_ASSERT_EQUAL(original_sound, alarm().sound);
+    TEST_ASSERT_EQUAL_STRING(editor().sound == HG_ALARM_SOUND_WOODEN ? "Wooden call" :
+                             editor().sound == HG_ALARM_SOUND_PLUCKED ? "Plucked dawn" :
+                                                                      "Warm mallets",
+                             lv_label_get_text(hg_clock_screen_test_sound_label()));
     app_hold();
     TEST_ASSERT_EQUAL(HG_ALARM_EDIT_NONE, editor().field);
     TEST_ASSERT_EQUAL(0, alarm().hour);
     TEST_ASSERT_EQUAL(1, alarm().minute);
+    TEST_ASSERT_EQUAL((original_sound + 1) % HG_ALARM_SOUND_COUNT, alarm().sound);
     TEST_ASSERT_FALSE(alarm().enabled);
     TEST_ASSERT_TRUE(lv_obj_has_flag(label, LV_OBJ_FLAG_HIDDEN));
     app_event(false, true);
     TEST_ASSERT_FALSE(alarm().enabled);
+    hg_alarm_commit_edit(0, 1, HG_ALARM_SOUND_MALLETS);
 }
 
 static hg_effects_snapshot_t feedback(void) {

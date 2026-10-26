@@ -7,6 +7,7 @@ void hg_alarm_init(void);
 void hg_alarm_update(void);
 void hg_alarm_get_snapshot(hg_alarm_snapshot_t *out);
 void hg_alarm_set_time(int hour, int minute);
+void hg_alarm_commit_edit(int hour, int minute, hg_alarm_sound_t sound);
 /* UI owner suppresses scheduling while a draft is edited; ending editing skips the current window. */
 void hg_alarm_set_editing(bool editing);
 void hg_alarm_set_enabled(bool enabled);

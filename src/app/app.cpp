@@ -64,9 +64,9 @@ static void sync_audio(hg_effects_snapshot_t *effects) {
     }
     hg_alarm_snapshot_t alarm;
     hg_alarm_get_snapshot(&alarm);
-    hg_sound_id_t sound = hg_sound_for_effects(effects);
+    hg_sound_id_t sound = hg_sound_for_effects(effects, alarm.sound);
     hg_audio_command_t command = {effects->generation, sound,
-                                  (uint8_t)(sound == HG_SOUND_ALARM ? alarm.volume_pct : 100)};
+                                  (uint8_t)(hg_sound_is_alarm(sound) ? alarm.volume_pct : 100)};
     hg_runtime_set_audio_command(&command);
     hg_audio_status_t audio;
     if (hg_runtime_get_audio_status(&audio) && audio.generation == effects->generation &&
@@ -209,8 +209,10 @@ void hg_app_loop(void) {
     hg_alarm_get_snapshot(&alarm_after);
     ui_dirty = ui_dirty || edit_before.field != edit_after.field ||
                edit_before.hour != edit_after.hour || edit_before.minute != edit_after.minute ||
+               edit_before.sound != edit_after.sound ||
                alarm_before.enabled != alarm_after.enabled ||
                alarm_before.hour != alarm_after.hour || alarm_before.minute != alarm_after.minute ||
+               alarm_before.sound != alarm_after.sound ||
                display_before != hg_display_mode_get();
     hg_navigator_update();
     update_effects(now);

@@ -13,6 +13,7 @@ typedef enum {
 
 void hg_brightness_init(void);
 void hg_brightness_update(const hg_light_snapshot_t *light);
+void hg_brightness_set_display_active(bool active);
 hg_light_level_t hg_brightness_get_light_level(void);
 uint8_t hg_brightness_get_percent(void);
 

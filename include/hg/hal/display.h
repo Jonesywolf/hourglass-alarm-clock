@@ -7,6 +7,7 @@
 
 bool hg_display_init(void);
 void hg_display_poll(void);
+/* On/off backlight control: zero is off, nonzero is on (no PWM dimming). */
 void hg_display_set_brightness(uint8_t percent);
 void hg_display_measure_frames(bool active);
 void hg_display_get_frame_timing(hg_timing_stats_t *out);

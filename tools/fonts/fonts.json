@@ -32,7 +32,7 @@
       "name": "icons_14",
       "source": "material-icons-outlined",
       "size": 14,
-      "icons": ["signal_wifi_bad", "signal_wifi_0_bar", "network_wifi_1_bar", "network_wifi_2_bar", "network_wifi_3_bar", "signal_wifi_4_bar", "volume_down", "volume_up"]
+      "icons": ["signal_wifi_bad", "signal_wifi_0_bar", "network_wifi_1_bar", "network_wifi_2_bar", "network_wifi_3_bar", "signal_wifi_4_bar", "volume_down", "volume_up", "music_note"]
     },
     {
       "_comment": "Wi-Fi status glyphs, boot-overlay size.",

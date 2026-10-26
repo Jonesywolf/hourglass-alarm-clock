@@ -8,7 +8,7 @@
 #define HG_PIN_TFT_CS        10
 #define HG_PIN_TFT_DC        9
 #define HG_PIN_TFT_RST       14
-#define HG_PIN_TFT_BL        (-1)
+#define HG_PIN_TFT_BL        13  /* Active HIGH */
 
 #define HG_PIN_I2C_SDA       4
 #define HG_PIN_I2C_SCL       5

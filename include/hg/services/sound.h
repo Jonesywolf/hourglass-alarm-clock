@@ -6,6 +6,7 @@
 #include <stdint.h>
 
 #include "hg/services/effects.h"
+#include "hg/types.h"
 
 /* Navigation and generic edit feedback remain silent; semantic alarm cues are synthesized. */
 typedef enum {
@@ -18,6 +19,8 @@ typedef enum {
     HG_SOUND_ALARM_SAVE,
     HG_SOUND_ALARM_ENABLE,
     HG_SOUND_ALARM_DISABLE,
+    HG_SOUND_ALARM_WOODEN,
+    HG_SOUND_ALARM_PLUCKED,
     HG_SOUND_COUNT
 } hg_sound_id_t;
 
@@ -34,7 +37,9 @@ typedef struct {
     uint8_t alarm_volume_pct;
 } hg_sound_player_t;
 
-hg_sound_id_t hg_sound_for_effects(const hg_effects_snapshot_t *effects);
+hg_sound_id_t hg_sound_for_effects(const hg_effects_snapshot_t *effects,
+                                  hg_alarm_sound_t alarm_sound = HG_ALARM_SOUND_MALLETS);
+bool hg_sound_is_alarm(hg_sound_id_t id);
 bool hg_sound_available(hg_sound_id_t id);
 bool hg_sound_player_start(hg_sound_player_t *player, hg_sound_id_t id, uint32_t sample_rate,
                            uint8_t alarm_volume_pct = 100);

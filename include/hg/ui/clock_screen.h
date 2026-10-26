@@ -11,6 +11,8 @@ void hg_clock_screen_update_alarm(const hg_alarm_snapshot_t *alarm);
 
 #ifdef HG_RUNTIME_TEST
 lv_obj_t *hg_clock_screen_test_alarm_label(void);
+lv_obj_t *hg_clock_screen_test_sound_label(void);
+lv_obj_t *hg_clock_screen_test_sound_icon(void);
 #endif
 
 #endif

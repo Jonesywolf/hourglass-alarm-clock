@@ -283,7 +283,7 @@ void test_encoder_stops_alarm_without_disabling(void) {
     hg_alarm_set_enabled(false);
 }
 
-void test_audio_worker_plays_acks_and_stops(void) {
+static void check_audio_worker_plays_acks_and_stops(void) {
     hg_app_test_hide_boot_overlay(true);
     TEST_ASSERT_TRUE_MESSAGE(hg_runtime_audio_running(), "speaker/audio worker not running");
     hg_runtime_diagnostics_t diagnostics;
@@ -348,6 +348,19 @@ void test_audio_worker_plays_acks_and_stops(void) {
     wait_overlay_gone();
     hg_alarm_dismiss();
     hg_alarm_set_enabled(false);
+}
+
+void test_audio_worker_plays_acks_and_stops(void) {
+    for (unsigned choice = 0; choice < HG_ALARM_SOUND_COUNT; ++choice) {
+        hg_alarm_snapshot_t alarm;
+        hg_alarm_get_snapshot(&alarm);
+        hg_alarm_commit_edit(alarm.hour, alarm.minute, (hg_alarm_sound_t)choice);
+        Serial.printf("AUDIO CHOICE %u\n", choice);
+        check_audio_worker_plays_acks_and_stops();
+    }
+    hg_alarm_snapshot_t alarm;
+    hg_alarm_get_snapshot(&alarm);
+    hg_alarm_commit_edit(alarm.hour, alarm.minute, HG_ALARM_SOUND_MALLETS);
 }
 
 static void settle_audio(void) {

@@ -30,7 +30,10 @@ static lv_color_t volume_fg, volume_bg;
 static const int volume_width = 28;
 
 static void volume_x(void *object, int32_t x) {
-    lv_obj_set_x(static_cast<lv_obj_t *>(object), x);
+    lv_obj_t *panel = static_cast<lv_obj_t *>(object);
+    lv_obj_set_x(panel, x);
+    // Render each animation step without waiting on a separately phased refresh timer.
+    lv_timer_ready(_lv_disp_get_refr_timer(lv_obj_get_disp(panel)));
 }
 
 static void volume_slide_finished(lv_anim_t *animation) {

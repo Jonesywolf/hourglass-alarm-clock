@@ -37,6 +37,7 @@ static void hg_display_mode_enter(hg_display_mode_t next, uint32_t now) {
         entered_red_ms = now;
     }
     mode = next;
+    hg_brightness_set_display_active(mode != HG_DISPLAY_MODE_OFF);
 }
 
 void hg_display_mode_init(void) {
@@ -44,6 +45,7 @@ void hg_display_mode_init(void) {
     entered_red_ms = 0;
     input_wake = false;
     last_input_ms = 0;
+    hg_brightness_set_display_active(true);
 }
 
 void hg_display_mode_update(void) {

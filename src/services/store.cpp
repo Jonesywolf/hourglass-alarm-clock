@@ -16,7 +16,16 @@ struct alarm_record_t {
     uint8_t volume_pct;
 };
 
+struct alarm_record_v2_t {
+    alarm_record_t alarm;
+    uint8_t sound;
+    uint8_t reserved[3];
+};
+
+static_assert(sizeof(alarm_record_t) == 8, "Legacy alarm record layout changed");
+static_assert(sizeof(alarm_record_v2_t) == 12, "Alarm v2 record layout changed");
 static const uint32_t record_magic = 0x48474131;
+static const uint32_t record_v2_magic = 0x48474132;
 static Preferences prefs;
 static portMUX_TYPE mux = portMUX_INITIALIZER_UNLOCKED;
 static hg_alarm_snapshot_t desired;
@@ -35,6 +44,7 @@ static bool decode_record(const alarm_record_t &record, hg_alarm_snapshot_t *out
     out->hour = record.hour;
     out->minute = record.minute;
     out->volume_pct = HG_ALARM_VOLUME_DEFAULT_PCT;
+    out->sound = HG_ALARM_SOUND_MALLETS;
     if (record.volume_pct != 0) {
         if (record.volume_pct >= HG_ALARM_VOLUME_MIN_PCT && record.volume_pct <= 100 &&
             record.volume_pct % HG_ALARM_VOLUME_STEP_PCT == 0) {
@@ -46,6 +56,25 @@ static bool decode_record(const alarm_record_t &record, hg_alarm_snapshot_t *out
     return true;
 }
 
+static bool decode_v2(const alarm_record_v2_t &record, hg_alarm_snapshot_t *out) {
+    if (record.alarm.magic != record_v2_magic ||
+        record.reserved[0] || record.reserved[1] || record.reserved[2]) {
+        HG_ERROR("store", "Invalid saved alarm v2 record\n");
+        return false;
+    }
+    alarm_record_t legacy = record.alarm;
+    legacy.magic = record_magic;
+    if (!decode_record(legacy, out)) {
+        return false;
+    }
+    if (record.sound < HG_ALARM_SOUND_COUNT) {
+        out->sound = (hg_alarm_sound_t)record.sound;
+    } else {
+        HG_ERROR("store", "Invalid saved alarm sound; using warm mallets\n");
+    }
+    return true;
+}
+
 #ifdef HG_RUNTIME_TEST
 static bool fake_writer = false;
 static bool fake_failure = false;
@@ -53,6 +82,11 @@ static uint32_t fake_delay_ms = 0;
 static bool scratch_writer = false;
 
 bool hg_store_test_decode_alarm(const uint8_t *bytes, size_t size, hg_alarm_snapshot_t *out) {
+    if (size == sizeof(alarm_record_v2_t)) {
+        alarm_record_v2_t record;
+        memcpy(&record, bytes, sizeof(record));
+        return decode_v2(record, out);
+    }
     if (size != sizeof(alarm_record_t)) {
         HG_ERROR("store", "Invalid saved alarm record size\n");
         return false;
@@ -89,7 +123,7 @@ void hg_store_test_scratch(bool enabled) {
 
 static bool save_alarm(const hg_alarm_snapshot_t *in) {
     const char *name = "hg-store";
-    const char *key = "alarm_v1";
+    const char *key = "alarm_v2";
 #ifdef HG_RUNTIME_TEST
     portENTER_CRITICAL(&mux);
     bool fake = fake_writer;
@@ -109,8 +143,9 @@ static bool save_alarm(const hg_alarm_snapshot_t *in) {
     if (!prefs.begin(name, false)) {
         return false;
     }
-    const alarm_record_t record = {record_magic, (uint8_t)in->enabled,
-                                   (uint8_t)in->hour, (uint8_t)in->minute, in->volume_pct};
+    const alarm_record_v2_t record = {
+        {record_v2_magic, (uint8_t)in->enabled, (uint8_t)in->hour,
+         (uint8_t)in->minute, in->volume_pct}, (uint8_t)in->sound, {0, 0, 0}};
     bool ok = prefs.putBytes(key, &record, sizeof(record)) == sizeof(record);
     prefs.end();
     return ok;
@@ -182,7 +217,15 @@ bool hg_store_load_alarm(hg_alarm_snapshot_t *out) {
         return false;
     }
     bool found = false;
-    if (prefs.isKey("alarm_v1")) {
+    if (prefs.isKey("alarm_v2")) {
+        alarm_record_v2_t record = {};
+        found = prefs.getBytesLength("alarm_v2") == sizeof(record) &&
+                prefs.getBytes("alarm_v2", &record, sizeof(record)) == sizeof(record) &&
+                decode_v2(record, out);
+        if (!found) {
+            HG_ERROR("store", "Invalid saved alarm v2 record; not loading older settings\n");
+        }
+    } else if (prefs.isKey("alarm_v1")) {
         alarm_record_t record = {};
         found = prefs.getBytesLength("alarm_v1") == sizeof(record) &&
                 prefs.getBytes("alarm_v1", &record, sizeof(record)) == sizeof(record) &&
@@ -199,6 +242,7 @@ bool hg_store_load_alarm(hg_alarm_snapshot_t *out) {
             out->hour = hour;
             out->minute = minute;
             out->volume_pct = HG_ALARM_VOLUME_DEFAULT_PCT;
+            out->sound = HG_ALARM_SOUND_MALLETS;
         } else {
             HG_ERROR("store", "Invalid legacy alarm settings\n");
         }
@@ -210,14 +254,15 @@ bool hg_store_load_alarm(hg_alarm_snapshot_t *out) {
 void hg_store_request_save_alarm(const hg_alarm_snapshot_t *in) {
     if (!in || in->hour < 0 || in->hour >= 24 || in->minute < 0 || in->minute >= 60 ||
         in->volume_pct < HG_ALARM_VOLUME_MIN_PCT || in->volume_pct > 100 ||
-        in->volume_pct % HG_ALARM_VOLUME_STEP_PCT != 0) {
+        in->volume_pct % HG_ALARM_VOLUME_STEP_PCT != 0 ||
+        (unsigned)in->sound >= HG_ALARM_SOUND_COUNT) {
         HG_ERROR("store", "Invalid alarm save request\n");
         return;
     }
     portENTER_CRITICAL(&mux);
     if (!request_seen || desired.enabled != in->enabled ||
         desired.hour != in->hour || desired.minute != in->minute ||
-        desired.volume_pct != in->volume_pct) {
+        desired.volume_pct != in->volume_pct || desired.sound != in->sound) {
         desired = *in;
         request_seen = true;
         ++status.requested_generation;

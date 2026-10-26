@@ -21,7 +21,7 @@ static bool editing = false;
 
 static void hg_alarm_request_save(void) {
     hg_alarm_snapshot_t saved = {snapshot.enabled, false, base_hour, base_minute, false,
-                                 snapshot.volume_pct};
+                                 snapshot.volume_pct, snapshot.sound};
     hg_store_request_save_alarm(&saved);
 }
 
@@ -111,6 +111,16 @@ void hg_alarm_set_time(int hour, int minute) {
     hg_alarm_restore_base();
     dirty = true;
     last_change_ms = millis();
+}
+
+void hg_alarm_commit_edit(int hour, int minute, hg_alarm_sound_t sound) {
+    if (hour < 0 || hour >= 24 || minute < 0 || minute >= 60 ||
+        (unsigned)sound >= HG_ALARM_SOUND_COUNT) {
+        HG_ERROR("alarm", "Invalid alarm edit\n");
+        return;
+    }
+    snapshot.sound = sound;
+    hg_alarm_set_time(hour, minute);
 }
 
 void hg_alarm_set_editing(bool active) {

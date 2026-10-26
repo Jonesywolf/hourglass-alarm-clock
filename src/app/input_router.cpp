@@ -44,7 +44,7 @@ static bool editing(void) {
 }
 
 static void finish_edit(uint32_t now) {
-    hg_alarm_set_time(edit.hour, edit.minute);
+    hg_alarm_commit_edit(edit.hour, edit.minute, edit.sound);
     edit.field = HG_ALARM_EDIT_NONE;
     hg_alarm_set_editing(false);
     hg_effects_request_feedback(HG_FEEDBACK_ALARM_SAVE, now);
@@ -60,7 +60,7 @@ static void hold_action(uint32_t now) {
     } else {
         hg_alarm_snapshot_t alarm;
         hg_alarm_get_snapshot(&alarm);
-        edit = {HG_ALARM_EDIT_MINUTE, alarm.hour, alarm.minute};
+        edit = {HG_ALARM_EDIT_MINUTE, alarm.hour, alarm.minute, alarm.sound};
         hg_alarm_set_editing(true);
         hg_effects_request_feedback(HG_FEEDBACK_ALARM_ENTER, now);
     }
@@ -73,7 +73,8 @@ static void short_action(uint32_t now) {
     }
     if (editing()) {
         edit.field = edit.field == HG_ALARM_EDIT_MINUTE ? HG_ALARM_EDIT_HOUR :
-                                                        HG_ALARM_EDIT_MINUTE;
+                     edit.field == HG_ALARM_EDIT_HOUR ? HG_ALARM_EDIT_SOUND :
+                                                       HG_ALARM_EDIT_MINUTE;
         hg_effects_request_feedback(HG_FEEDBACK_ALARM_FIELD, now);
     } else {
         hg_alarm_snapshot_t alarm;
@@ -94,6 +95,12 @@ static void clock_rotation(int32_t delta, uint32_t now) {
             volume = {true, false, alarm.volume_pct};
             last_volume_ms = now;
         }
+        return;
+    }
+    if (edit.field == HG_ALARM_EDIT_SOUND) {
+        int sound = (int)edit.sound + (int)(delta % (int)HG_ALARM_SOUND_COUNT);
+        edit.sound = (hg_alarm_sound_t)((sound + HG_ALARM_SOUND_COUNT) % HG_ALARM_SOUND_COUNT);
+        last_encoder_ms = now;
         return;
     }
     int minutes = edit.hour * 60 + edit.minute;

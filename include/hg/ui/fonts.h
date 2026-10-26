@@ -24,6 +24,8 @@ LV_FONT_DECLARE(inter_14);
 #define HG_FONT_VOLUME_ICON  (&icons_14)
 #define HG_ICON_VOLUME_LOW   "\uE04D"
 #define HG_ICON_VOLUME_HIGH  "\uE050"
+#define HG_FONT_SOUND_ICON  (&icons_14)
+#define HG_ICON_MUSIC_NOTE  "\uE405"
 
 /* Glyphs in icons_alarm_72 / icons_36 (Material Icons Outlined). */
 #define HG_ICON_ALARM      "\uE855"

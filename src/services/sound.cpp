@@ -41,18 +41,32 @@ static const sound_descriptor_t sounds[HG_SOUND_COUNT] = {
     /* HG_SOUND_ALARM_SAVE */ {nullptr, nullptr, false, 0, 0, 0, 0, save, 3},
     /* HG_SOUND_ALARM_ENABLE */ {nullptr, nullptr, false, 0, 0, 0, 0, enable, 1},
     /* HG_SOUND_ALARM_DISABLE */ {nullptr, nullptr, false, 0, 0, 0, 0, disable, 1},
+    /* HG_SOUND_ALARM_WOODEN */ {hg_alarm_wooden_pcm, &hg_alarm_wooden_frames, true,
+        HG_ALARM_VOLUME_START_PCT / 100.0f, HG_ALARM_VOLUME_MAX_PCT / 100.0f,
+        HG_ALARM_RAMP_MS, HG_AUDIO_FADE_IN_MS},
+    /* HG_SOUND_ALARM_PLUCKED */ {hg_alarm_plucked_pcm, &hg_alarm_plucked_frames, true,
+        HG_ALARM_VOLUME_START_PCT / 100.0f, HG_ALARM_VOLUME_MAX_PCT / 100.0f,
+        HG_ALARM_RAMP_MS, HG_AUDIO_FADE_IN_MS},
 };
 
 static const sound_descriptor_t *descriptor(hg_sound_id_t id) {
     return (unsigned)id < HG_SOUND_COUNT ? &sounds[id] : &sounds[HG_SOUND_NONE];
 }
 
-hg_sound_id_t hg_sound_for_effects(const hg_effects_snapshot_t *effects) {
+bool hg_sound_is_alarm(hg_sound_id_t id) {
+    return id == HG_SOUND_ALARM || id == HG_SOUND_ALARM_WOODEN || id == HG_SOUND_ALARM_PLUCKED;
+}
+
+hg_sound_id_t hg_sound_for_effects(const hg_effects_snapshot_t *effects, hg_alarm_sound_t alarm_sound) {
     if (!effects) {
         return HG_SOUND_NONE;
     }
     if (effects->phase == HG_EFFECT_RINGING) {
-        return HG_SOUND_ALARM;
+        switch (alarm_sound) {
+        case HG_ALARM_SOUND_WOODEN: return HG_SOUND_ALARM_WOODEN;
+        case HG_ALARM_SOUND_PLUCKED: return HG_SOUND_ALARM_PLUCKED;
+        default: return HG_SOUND_ALARM;
+        }
     }
     if (effects->phase != HG_EFFECT_NORMAL) {
         return HG_SOUND_NONE;
@@ -203,7 +217,7 @@ size_t hg_sound_player_render(hg_sound_player_t *player, int16_t *out, size_t fr
     float start = hg_sound_gain_at(player->id, player->elapsed, player->sample_rate);
     float end = hg_sound_gain_at(player->id, player->elapsed + (uint32_t)produced,
                                  player->sample_rate);
-    if (player->id == HG_SOUND_ALARM) {
+    if (hg_sound_is_alarm(player->id)) {
         start *= player->alarm_volume_pct / 100.0f;
         end *= player->alarm_volume_pct / 100.0f;
     }

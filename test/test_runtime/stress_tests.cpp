@@ -267,7 +267,7 @@ void test_audio_cues_under_load(void) {
     TEST_ASSERT_TRUE(cpu_load_ok);
 }
 
-void test_audio_playback_under_load(void) {
+static void check_audio_playback_under_load(void) {
     hg_app_test_hide_boot_overlay(true);
     TEST_ASSERT_TRUE_MESSAGE(hg_runtime_audio_running(), "speaker/audio worker not running");
     hg_runtime_diagnostics_t before;
@@ -315,6 +315,19 @@ void test_audio_playback_under_load(void) {
     TEST_ASSERT_EQUAL_UINT32(0, errors);
     TEST_ASSERT_GREATER_THAN_UINT32(256, loaded.stack_free_bytes[3]);
     TEST_ASSERT_TRUE(cpu_load_ok);
+}
+
+void test_audio_playback_under_load(void) {
+    for (unsigned choice = 0; choice < HG_ALARM_SOUND_COUNT; ++choice) {
+        hg_alarm_snapshot_t alarm;
+        hg_alarm_get_snapshot(&alarm);
+        hg_alarm_commit_edit(alarm.hour, alarm.minute, (hg_alarm_sound_t)choice);
+        Serial.printf("AUDIO LOAD CHOICE %u\n", choice);
+        check_audio_playback_under_load();
+    }
+    hg_alarm_snapshot_t alarm;
+    hg_alarm_get_snapshot(&alarm);
+    hg_alarm_commit_edit(alarm.hour, alarm.minute, HG_ALARM_SOUND_MALLETS);
 }
 
 void test_real_nvs_admission_timing(void) {

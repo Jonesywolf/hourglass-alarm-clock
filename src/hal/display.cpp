@@ -79,6 +79,10 @@ static void hg_display_flush(lv_disp_drv_t *disp, const lv_area_t *area, lv_colo
 }
 
 bool hg_display_init(void) {
+    if (HG_PIN_TFT_BL >= 0) {
+        pinMode(HG_PIN_TFT_BL, OUTPUT);
+        digitalWrite(HG_PIN_TFT_BL, LOW);
+    }
     if (!gfx.begin()) {
         return false;
     }
@@ -99,7 +103,9 @@ bool hg_display_init(void) {
 }
 
 void hg_display_set_brightness(uint8_t percent) {
-    (void)percent;
+    if (HG_PIN_TFT_BL >= 0) {
+        digitalWrite(HG_PIN_TFT_BL, percent > 0 ? HIGH : LOW);
+    }
 }
 
 void hg_display_poll(void) {

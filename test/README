@@ -20,7 +20,7 @@
 - Do not interact with touch/encoder while automated input/timing tests run.
 - The alarm tests ring the real alarm and drive the I2S amp. `runtime-test` caps the
   alarm volume at 1-2 % (`HG_ALARM_VOLUME_*_PCT` in `config.h`), so expect only a
-  faint beeping for a few seconds; do not raise it to pass a test.
+  faint chimes for a few seconds; do not raise it to pass a test.
 - Alarm interaction cues use a separate 2% full-scale cap. They also exercise the
   real speaker; obtain permission for quiet cue playback as well as alarm tests.
 
@@ -70,6 +70,28 @@ has been verified by it.
 
 ## What runs
 
+- `alarm_choice_tests.cpp`: all three approved PCM identities (sample hashes and
+  96,000-frame lengths), mapping, loop/chunk equivalence and scaled caps at
+  5/75/100%, v2 sound decoding, legacy defaults, malformed records/sound IDs,
+  sound-only debounced saves, deduplication, and snoozed base-time preservation.
+  Invalid sound/record logs are expected in the named record test.
+- Sound-editor coverage in `alarm_edit_tests.cpp` checks minute/hour/sound field
+  cycling, staged choice, negative/extreme deltas, silent choice rotation,
+  hold/timeout commit, selected sound-label blink and nonoverlapping geometry.
+  Real audio worker start/stop and combined-load alarm stress now run each of the
+  three choices, with the original timing/audio-error limits unchanged.
+- Hardware-free asset/converter checks:
+  `python -m unittest discover -s tools\audio -p "test_*.py"`; these do not prove
+  on-device frame timing, worker behavior or audible wake-up strength.
+
+Manual sound-selection checks on normal firmware: hold on clock, short-press
+through minutes/hours/sound, rotate both ways, save by hold and by inactivity,
+and confirm the chosen name reappears on editing after reboot. Confirm idle
+rotation still changes volume, not sound; field-change cues remain unchanged.
+Listen to each choice for continuous tails and adequate wake-up presence at the
+desired volume. The new loops retain approved audition levels, not the loudness
+of the old beep. Do not raise quiet test caps as a substitute for this check.
+
 - `effects_tests.cpp`: absent backends, ringing/sunrise precedence, feedback
   rejection/non-replay, wrap-safe expiry, cancellation generations/stop
   acknowledgement, opt-in AQI policy, timing histogram behavior, and semantic
@@ -93,7 +115,9 @@ has been verified by it.
   midnight carry/borrow, disabled-alarm draft editing, ten-second inactivity save,
   ignored touch, scheduling suppression/current-minute commit, page/generation
   isolation, lost-release recovery, timer wraparound, wake-only gestures,
-  nighttime timeouts/50-lux cancellation/alarm visibility guards, and selected
+  nighttime timeouts/50-lux cancellation/alarm visibility guards,
+  backlight GPIO13 LOW while off (including brightness refresh) and HIGH after
+  button/rotation/touch, bright-light, or alarm wake, and selected
   digit flashing with stable label width, whole-hold alarm dismissal during
   blocked navigation, real-loop editor snapshot handoffs, and exact action-cue
   identity/generations including unchanged-time timeout save. Separate cue checks
@@ -106,7 +130,8 @@ has been verified by it.
   volume records, debounced volume-only saves, scaled PCM at minimum/default/
   maximum, unchanged cues, immediate app handoff, editing isolation, panel
   geometry/icon/theme (including low/high glyphs at the 50/55% boundary),
-  animation reversal and immediate cancellation.
+  animation reversal and immediate cancellation, plus refresh-timer readiness
+  on animation start even when the display timer has just been reset.
   Invalid-record/size/volume logs are expected only in the named record test.
 - `stress_tests.cpp` also reports `VOLUME LOAD`: repeated panel entry/exit under
   combined sensor/network/CPU load. Require >24 rendered frames, frame maximum
@@ -262,6 +287,33 @@ After the automated suite restores normal firmware:
   adjustments must be recorded separately from automated passes.
 
 ## Reference measurements
+
+The three-choice alarm and sound-name music icon passed all 50 cases on the
+ESP32-S3 clock on COM4 (test exit 0; production restoration exit 0), including
+the volume-refresh scheduling assertion. The final baseline/loaded slide
+maxima were 32.235 / 32.371 ms, with p95 33 ms in both series. Volume load
+rendered 105 frames with p95 35 ms, maximum 45.161 ms and capture maximum
+5.500 ms. Each sound started in 42 ms and acknowledged stop in 5 ms; the three
+loaded-alarm frame maxima were 32.571 / 32.702 / 32.400 ms, with zero detected
+underruns/write errors. Four scratch saves passed (longest 18.070 ms), with
+capture/frame maxima 5.490 / 32.422 ms and successful probe cleanup. Restored
+production serial output showed advancing touch scans and zero timeouts.
+The five hardware-free asset/converter tests also passed.
+
+Retained failure evidence: icon validation repeatedly exposed volume-frame
+maxima around 60.7 ms. A traced 60.801 ms interval contained only 1.936 ms of
+pixel transfer, and position updates continued while a refresh was skipped.
+Avoiding identical label replacements and using the page-slide loop cadence
+did not resolve it; those trial changes were removed. Readying the display
+refresh timer after each volume-position update preserved the easing/duration
+and met the unchanged 50 ms limit in three full runs (volume maxima
+45.686 / 47.821 / 45.161 ms). The middle run still failed the separate,
+previously observed scratch-NVS capture limit: a 102.074 ms write coincided
+with a 27.585 ms capture gap. Probe cleanup and production restoration passed;
+the unchanged confirmation run passed all 50 cases. Rare flash stalls remain
+a caveat, not a problem solved by this display change. No storage erasure,
+probe overwrite, relaxed threshold, or speculative audio-pop fix was used.
+Digital worker counters do not establish whether analog playback is pop-free.
 
 The clock-volume implementation, including the two-state speaker icon, passed
 all 47 cases on the ESP32-S3 clock on COM4 (test exit 0; normal-firmware build/

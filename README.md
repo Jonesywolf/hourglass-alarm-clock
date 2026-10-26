@@ -53,6 +53,9 @@ The UI polls completion or waits only for its own finite display transfer, never
 for background work. SPI2 is exclusively owned by this display; do not share it
 with another driver. The two buffers total 51,200 bytes of internal RAM; include
 that in future audio/DMA budgets. This is not a guarantee of 60 fps.
+Volume-panel position updates ready the LVGL display-refresh timer so animation
+steps are not delayed or coalesced by its independent refresh phase. Rendering
+and DMA acknowledgement still run through the ordinary UI-task LVGL handler.
 
 ## Effects and indoor-air policy
 
@@ -94,13 +97,17 @@ and CPU budgets, and merge any LED worker's applied state into the same
 - Hold the encoder button for one second to enter setting mode. The alarm can be
   enabled or disabled; editing does not change that state. Minutes flash first.
 - Rotate for one-minute steps, carrying/borrowing hours and wrapping at midnight.
-  Short-press to alternate the flashing minutes/hours; hour steps preserve minutes
+  Short-press to cycle minutes -> hours -> sound -> minutes; hour steps preserve minutes
   and cycle through all 24 hours, including the am/pm change.
+- While editing, a music-note icon and small label above the alarm time show the sound. Both flash
+  when sound is selected; rotate to cycle Warm mallets (1A, default), Wooden call
+  (1F), and Plucked dawn (1H), wrapping in either direction. Choice changes are
+  silent, and the current sound is copied into the draft on entry.
 - Release the entry hold before pressing again. Another one-second hold saves,
   or ten seconds without encoder activity saves automatically. Touch is ignored
   and does not extend the editor timeout.
 - Alarm scheduling is suppressed while editing. Detents change only a draft;
-  only the committed time is sent through the existing asynchronous save path.
+  only the committed time and sound are sent through the asynchronous save path.
   Saving a time matching the current minute does not ring immediately.
 - Outside editing, a short press on the clock page toggles alarm enabled on
   **release**, not on button-down. Other pages do not edit or toggle the alarm
@@ -121,13 +128,15 @@ and CPU budgets, and merge any LED worker's applied state into the same
   time-editing, stop/snooze, and first-gesture-only-wakes behavior is unchanged.
 - Volume scales the whole 30-second alarm ramp. At 100%, speaker output ramps
   from 5% to the new 80% cap. The initial 75% setting ramps from 3.75% to 60%,
-  retaining the previous final loudness. Alarm volume does not affect UI chimes.
+  retaining the prior gain policy, not the old beep's perceived loudness. The new
+  clips preserve their approved, quieter audition levels; check wake-up strength
+  on the speaker before relying on the alarm. Alarm volume does not affect UI chimes.
 - Volume is saved asynchronously after adjustment stops and flash writes are
   admitted; allow the save to complete before disconnecting power.
 
 **Quiet alarm feedback:**
 
-- Enter editing: a soft rounded tap; switch either field: a shorter, higher tap.
+- Enter editing: a soft rounded tap; switch fields: a shorter, higher tap.
 - Hold-save and ten-second timeout-save: the same two-note warm confirmation.
   This confirms the accepted time, even if unchanged, not completion of the
   asynchronous flash write. Save failures still follow the logged retry path.
@@ -141,7 +150,8 @@ and CPU budgets, and merge any LED worker's applied state into the same
 **Nighttime display and wake:**
 
 - At or below 5 lux the display becomes red; after 60 minutes it blanks the clock
-  labels. This is not backlight power-off. At or above 50 lux it returns to normal.
+  labels and switches the active-high GPIO13 backlight off. Wake restores the
+  backlight; at or above 50 lux it returns to normal.
   Intermediate light levels do not cancel the initial countdown.
 - Touch, encoder press, or rotation while off wakes into red mode. The first
   interaction only wakes: it cannot navigate, toggle, or edit. A waking button
@@ -183,7 +193,10 @@ active or stopping, effects are timing-sensitive, so flash writes are deferred.
   volume ramp (`HG_ALARM_VOLUME_START_PCT` → `HG_ALARM_VOLUME_MAX_PCT` over
   `HG_ALARM_RAMP_MS`, measured in rendered audio frames, plus a short fade-in).
   Tune the cap on the device; automated test builds use 1-2 % so they stay quiet.
-- The alarm uses the existing PCM clip. Five semantic alarm-action sounds are
+- The alarm offers three original six-second PCM loops: Warm mallets (1A),
+  Wooden call (1F), and Plucked dawn (1H). They live in read-only flash, not
+  three RAM buffers, and share the same ramp, saved volume and startup fade.
+  Five semantic alarm-action sounds are
   synthesized from original tone descriptors in `services/sound`: rounded,
   decaying taps and layered chimes with smooth attack/release, no pitch sweeps.
   They last 40-182 ms and peak below `HG_UI_CUE_VOLUME_PCT` (2% full scale),
@@ -200,31 +213,36 @@ active or stopping, effects are timing-sensitive, so flash writes are deferred.
   `hg_runtime_get_diagnostics()` (cumulative, not cleared by reset).
 - A flash write already in flight when the alarm starts is covered by the DMA ring
   (measured NVS writes are tens of ms); new writes are then deferred.
-- The clip is `assets/audio/alarm_clip_16k_mono.wav` (CC0, see
-  `assets/audio/ATTRIBUTION.md`). Regenerate the embedded copy after replacing it:
+- The clips are `assets/audio/warm_mallets.wav`, `wooden_call.wav` and
+  `plucked_dawn.wav` (original synthesis; see `assets/audio/ATTRIBUTION.md` for
+  provenance, approved PCM hashes and reproducible WAV generation).
+  Regenerate their embedded constants after changing them:
 
 ```powershell
 & "$env:USERPROFILE\.platformio\penv\Scripts\python.exe" tools\audio\wav_to_pcm.py
 ```
 
 `src/services/sound_alarm_clip.cpp` is generated; do not edit or open it. The WAV must
-be mono, 16-bit, `HG_AUDIO_SAMPLE_RATE`, and end in silence so the loop point is clean.
+be six seconds, mono, 16-bit, `HG_AUDIO_SAMPLE_RATE`. Preserve continuous tails
+across loop points rather than adding a repeated fade to silence. The approved
+clips have matched RMS, not guaranteed equal perceived loudness.
 
 ## Persistence
 
-Alarm time/volume edits retain their debounce; enable changes request an asynchronous save.
+Alarm time/sound/volume edits retain their debounce; enable changes request an asynchronous save.
 The store worker coalesces desired settings and tracks requested/saved generations,
 failures, pending/writing state, and write timing. An old completion cannot clear a
 newer pending save. Failures remain pending and retry with backoff.
 
-New saves use one validated `alarm_v1` blob in the existing `hg-store` namespace,
-avoiding partially updated hour/minute/enabled keys. Existing legacy settings are
-read and migrate on the next save.
-The blob's formerly reserved byte now stores volume; zero from older firmware
-means the 75% default. Invalid volume logs an error and uses that default without
-discarding valid time/enabled settings. Older firmware can still read the record,
-but saving with it resets the volume byte to zero. Volume saves during snooze
-retain the base alarm time, never the temporary snooze time.
+New saves use one validated twelve-byte `alarm_v2` blob in `hg-store`, atomically
+storing time, enabled state, volume and sound. Existing eight-byte `alarm_v1`
+records and separate legacy keys remain readable and migrate on the next save.
+Missing sound defaults to Warm mallets. A legacy zero volume means 75%. Invalid
+sound/volume logs an error and defaults only that field, preserving valid time
+and enabled settings. Malformed v2 base records log an error and do not fall back
+to stale v1 settings. No keys are erased and saves do not dual-write schemas.
+Downgraded firmware sees its last pre-v2 settings, not later v2 edits.
+All saves during snooze retain the base alarm time, never the temporary snooze time.
 
 Flash-write admission is disabled during slides, recent interaction, and declared
 timing-sensitive effects. Flash/cache activity can stall **both cores**, so moving

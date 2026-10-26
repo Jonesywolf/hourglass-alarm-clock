@@ -54,6 +54,9 @@ void test_volume_scaled_pcm_and_unchanged_cues(void);
 void test_volume_panel_animation_and_cancellation(void);
 void test_volume_immediate_app_handoff_and_editing(void);
 void test_volume_animation_under_load(void);
+void test_alarm_choice_record_and_saves(void);
+void test_alarm_choice_pcm_and_scaling(void);
+void test_alarm_sound_editor_and_presentation(void);
 
 void setUp(void) {}
 void tearDown(void) {
@@ -86,6 +89,7 @@ void setup(void) {
     RUN_TEST(test_navigation_and_encoder_routing);
     RUN_TEST(test_alarm_during_slide_and_overlay);
     RUN_TEST(test_alarm_editor_fields_and_commit);
+    RUN_TEST(test_alarm_sound_editor_and_presentation);
     RUN_TEST(test_alarm_editor_touch_and_idle_save);
     RUN_TEST(test_alarm_editor_suppression_and_matching_commit);
     RUN_TEST(test_alarm_editor_page_and_generation_isolation);
@@ -104,6 +108,8 @@ void setup(void) {
     RUN_TEST(test_volume_panel_animation_and_cancellation);
     RUN_TEST(test_volume_immediate_app_handoff_and_editing);
     RUN_TEST(test_sound_mapping_and_availability);
+    RUN_TEST(test_alarm_choice_record_and_saves);
+    RUN_TEST(test_alarm_choice_pcm_and_scaling);
     RUN_TEST(test_sound_ramp_loop_and_limits);
     RUN_TEST(test_alarm_cue_waveforms);
     RUN_TEST(test_alarm_snooze_keeps_saved_time);

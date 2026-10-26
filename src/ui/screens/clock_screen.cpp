@@ -8,6 +8,8 @@ static lv_obj_t *clock_label;
 static lv_obj_t *meridiem_label;
 static lv_obj_t *wifi_label;
 static lv_obj_t *alarm_label;
+static lv_obj_t *sound_label;
+static lv_obj_t *sound_icon;
 static lv_timer_t *alarm_blink_timer;
 static hg_alarm_snapshot_t shown_alarm;
 static hg_alarm_edit_snapshot_t shown_edit;
@@ -31,6 +33,22 @@ static void render_alarm(void) {
         return;
     }
     bool editing = shown_edit.field != HG_ALARM_EDIT_NONE;
+    if (display_active && editing) {
+        static const char *const names[] = {"Warm mallets", "Wooden call", "Plucked dawn"};
+        unsigned choice = (unsigned)shown_edit.sound;
+        lv_label_set_text(sound_label, choice < HG_ALARM_SOUND_COUNT ? names[choice] : "Sound error");
+        lv_obj_set_style_text_color(sound_label,
+            !blink_visible && shown_edit.field == HG_ALARM_EDIT_SOUND ?
+            hg_theme_bg() : hg_theme_alarm(), 0);
+        lv_obj_set_style_text_color(sound_icon,
+            !blink_visible && shown_edit.field == HG_ALARM_EDIT_SOUND ?
+            hg_theme_bg() : hg_theme_alarm(), 0);
+        lv_obj_clear_flag(sound_label, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_clear_flag(sound_icon, LV_OBJ_FLAG_HIDDEN);
+    } else {
+        lv_obj_add_flag(sound_label, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_add_flag(sound_icon, LV_OBJ_FLAG_HIDDEN);
+    }
     if (!display_active || (!shown_alarm.enabled && !editing)) {
         lv_obj_add_flag(alarm_label, LV_OBJ_FLAG_HIDDEN);
         return;
@@ -139,6 +157,18 @@ void hg_clock_screen_create(lv_obj_t *parent) {
     lv_label_set_text(alarm_label, "--:--");
     lv_obj_add_flag(alarm_label, LV_OBJ_FLAG_HIDDEN);
     lv_obj_align(alarm_label, LV_ALIGN_BOTTOM_LEFT, 10, -10);
+    sound_label = lv_label_create(parent);
+    lv_obj_set_style_text_font(sound_label, HG_FONT_STATUS, 0);
+    lv_obj_clear_flag(sound_label, LV_OBJ_FLAG_CLICKABLE);
+    lv_label_set_text(sound_label, "");
+    lv_obj_align(sound_label, LV_ALIGN_BOTTOM_LEFT, 30, -46);
+    lv_obj_add_flag(sound_label, LV_OBJ_FLAG_HIDDEN);
+    sound_icon = lv_label_create(parent);
+    lv_obj_set_style_text_font(sound_icon, HG_FONT_SOUND_ICON, 0);
+    lv_obj_clear_flag(sound_icon, LV_OBJ_FLAG_CLICKABLE);
+    lv_label_set_text(sound_icon, HG_ICON_MUSIC_NOTE);
+    lv_obj_align(sound_icon, LV_ALIGN_BOTTOM_LEFT, 10, -46);
+    lv_obj_add_flag(sound_icon, LV_OBJ_FLAG_HIDDEN);
     shown_alarm = {};
     shown_edit = {};
     display_active = true;
@@ -163,7 +193,8 @@ void hg_clock_screen_update(const hg_clock_snapshot_t *snap) {
 
     bool edit_changed = shown_edit.field != snap->alarm_edit.field ||
                         shown_edit.hour != snap->alarm_edit.hour ||
-                        shown_edit.minute != snap->alarm_edit.minute;
+                        shown_edit.minute != snap->alarm_edit.minute ||
+                        shown_edit.sound != snap->alarm_edit.sound;
     shown_edit = snap->alarm_edit;
     display_active = snap->display_active;
     if (shown_edit.field == HG_ALARM_EDIT_NONE) {
@@ -180,6 +211,8 @@ void hg_clock_screen_update(const hg_clock_snapshot_t *snap) {
         lv_obj_add_flag(meridiem_label, LV_OBJ_FLAG_HIDDEN);
         lv_obj_add_flag(wifi_label, LV_OBJ_FLAG_HIDDEN);
         lv_obj_add_flag(alarm_label, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_add_flag(sound_label, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_add_flag(sound_icon, LV_OBJ_FLAG_HIDDEN);
         return;
     }
 
@@ -250,5 +283,11 @@ void hg_clock_screen_update(const hg_clock_snapshot_t *snap) {
 #ifdef HG_RUNTIME_TEST
 lv_obj_t *hg_clock_screen_test_alarm_label(void) {
     return alarm_label;
+}
+lv_obj_t *hg_clock_screen_test_sound_label(void) {
+    return sound_label;
+}
+lv_obj_t *hg_clock_screen_test_sound_icon(void) {
+    return sound_icon;
 }
 #endif
