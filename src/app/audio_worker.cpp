@@ -19,8 +19,9 @@ void hg_runtime_test_audio_failure(bool start, bool write) {
 
 static int16_t chunk[HG_AUDIO_CHUNK_FRAMES];
 
-static bool start_playback(hg_sound_player_t *player, hg_sound_id_t sound) {
-    if (!hg_sound_player_start(player, sound, hg_speaker_sample_rate())) {
+static bool start_playback(hg_sound_player_t *player, const hg_audio_command_t &command) {
+    if (!hg_sound_player_start(player, command.sound, hg_speaker_sample_rate(),
+                               command.alarm_volume_pct)) {
         return false;
     }
 #ifdef HG_RUNTIME_TEST
@@ -55,7 +56,8 @@ void hg_audio_worker_task(void *) {
     for (;;) {
         hg_audio_command_t latest;
         if (xQueuePeek(hg_audio_command_mailbox, &latest, 0) == pdTRUE &&
-            (latest.generation != desired.generation || latest.sound != desired.sound)) {
+            (latest.generation != desired.generation || latest.sound != desired.sound ||
+             latest.alarm_volume_pct != desired.alarm_volume_pct)) {
             desired = latest;
             if (playing) {
                 hg_speaker_stop();
@@ -70,7 +72,7 @@ void hg_audio_worker_task(void *) {
 #ifdef HG_RUNTIME_TEST
                 ++status.start_attempts;
 #endif
-                playing = start_playback(&player, desired.sound);
+                playing = start_playback(&player, desired);
                 if (!playing) {
                     retry_pending = player.loop;
                     retry_at_ms = millis() + HG_AUDIO_RETRY_MS;
@@ -114,7 +116,7 @@ void hg_audio_worker_task(void *) {
 #ifdef HG_RUNTIME_TEST
             ++status.start_attempts;
 #endif
-            playing = start_playback(&player, desired.sound);
+            playing = start_playback(&player, desired);
             if (!playing) {
                 retry_pending = true;
                 retry_at_ms = millis() + HG_AUDIO_RETRY_MS;

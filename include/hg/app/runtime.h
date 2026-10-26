@@ -24,6 +24,7 @@ typedef struct {
 typedef struct {
     uint32_t generation;
     hg_sound_id_t sound;
+    uint8_t alarm_volume_pct;
 } hg_audio_command_t;
 
 /* Audio worker -> UI task. `active` describes the output for `generation`. */

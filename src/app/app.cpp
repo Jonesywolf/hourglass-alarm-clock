@@ -62,7 +62,11 @@ static void sync_audio(hg_effects_snapshot_t *effects) {
     if (!hg_runtime_audio_running()) {
         return;
     }
-    hg_audio_command_t command = {effects->generation, hg_sound_for_effects(effects)};
+    hg_alarm_snapshot_t alarm;
+    hg_alarm_get_snapshot(&alarm);
+    hg_sound_id_t sound = hg_sound_for_effects(effects);
+    hg_audio_command_t command = {effects->generation, sound,
+                                  (uint8_t)(sound == HG_SOUND_ALARM ? alarm.volume_pct : 100)};
     hg_runtime_set_audio_command(&command);
     hg_audio_status_t audio;
     if (hg_runtime_get_audio_status(&audio) && audio.generation == effects->generation &&
@@ -196,6 +200,7 @@ void hg_app_loop(void) {
     hg_input_router_get_alarm_edit(&edit_before);
     hg_alarm_get_snapshot(&alarm_before);
     hg_display_mode_t display_before = hg_display_mode_get();
+    hg_input_router_set_volume_allowed(navigation_allowed && !hg_overlays_alarm_visible());
     if (hg_input_router_update(navigation_allowed)) {
         last_activity_ms = now;
         hg_store_set_flash_allowed(false);
@@ -209,6 +214,12 @@ void hg_app_loop(void) {
                display_before != hg_display_mode_get();
     hg_navigator_update();
     update_effects(now);
+    hg_input_router_set_volume_allowed(navigation_allowed && !hg_overlays_alarm_visible() &&
+        !hg_navigator_is_sliding() && hg_navigator_current() == HG_PAGE_CLOCK &&
+        edit_after.field == HG_ALARM_EDIT_NONE && !alarm_after.ringing);
+    hg_volume_snapshot_t volume;
+    hg_input_router_get_volume(&volume);
+    hg_overlays_set_volume(&volume);
 
     if (now - last_ui_ms >= HG_UI_TICK_MS) {
         last_ui_ms = now;
@@ -227,7 +238,7 @@ void hg_app_loop(void) {
         hg_store_set_flash_allowed(false);
     }
 
-    hg_display_measure_frames(sliding);
+    hg_display_measure_frames(sliding || hg_overlays_volume_animating());
     uint32_t started_us = micros();
     uint32_t wait_ms = lv_timer_handler();
     hg_runtime_record_ui(started_us, micros() - started_us, sliding);

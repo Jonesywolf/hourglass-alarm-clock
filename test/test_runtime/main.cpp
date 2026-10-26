@@ -46,10 +46,19 @@ void test_audio_cue_completion_and_preemption(void);
 void test_audio_cue_failures_do_not_retry(void);
 void test_audio_cues_under_load(void);
 void alarm_edit_test_cleanup(void);
+void volume_test_cleanup(void);
+void test_volume_steps_clamps_and_timeout(void);
+void test_volume_context_and_snooze_isolation(void);
+void test_volume_record_compatibility_and_coalescing(void);
+void test_volume_scaled_pcm_and_unchanged_cues(void);
+void test_volume_panel_animation_and_cancellation(void);
+void test_volume_immediate_app_handoff_and_editing(void);
+void test_volume_animation_under_load(void);
 
 void setUp(void) {}
 void tearDown(void) {
     alarm_edit_test_cleanup();
+    volume_test_cleanup();
     hg_runtime_test_audio_failure(false, false);
     hg_runtime_test_load(0, 0, 0);
     hg_store_set_flash_allowed(false);
@@ -88,6 +97,12 @@ void setup(void) {
     RUN_TEST(test_alarm_editor_app_snapshot_handoff);
     RUN_TEST(test_alarm_action_cues);
     RUN_TEST(test_alarm_cues_ignore_consumed_input);
+    RUN_TEST(test_volume_steps_clamps_and_timeout);
+    RUN_TEST(test_volume_context_and_snooze_isolation);
+    RUN_TEST(test_volume_record_compatibility_and_coalescing);
+    RUN_TEST(test_volume_scaled_pcm_and_unchanged_cues);
+    RUN_TEST(test_volume_panel_animation_and_cancellation);
+    RUN_TEST(test_volume_immediate_app_handoff_and_editing);
     RUN_TEST(test_sound_mapping_and_availability);
     RUN_TEST(test_sound_ramp_loop_and_limits);
     RUN_TEST(test_alarm_cue_waveforms);
@@ -99,6 +114,7 @@ void setup(void) {
     RUN_TEST(test_combined_load_frame_timing);
     RUN_TEST(test_audio_playback_under_load);
     RUN_TEST(test_audio_cues_under_load);
+    RUN_TEST(test_volume_animation_under_load);
     RUN_TEST(test_real_nvs_admission_timing);
     UNITY_END();
 }

@@ -20,6 +20,122 @@ static lv_obj_t *knob_text;
 static bool prev_snoozed = false;
 static int shown_key = -1;
 static uint32_t confirm_until_ms = 0;
+static lv_obj_t *volume_root;
+static lv_obj_t *volume_bar;
+static lv_obj_t *volume_icon;
+static bool volume_shown = false;
+static bool volume_colors_valid = false;
+static bool volume_icon_high = true;
+static lv_color_t volume_fg, volume_bg;
+static const int volume_width = 28;
+
+static void volume_x(void *object, int32_t x) {
+    lv_obj_set_x(static_cast<lv_obj_t *>(object), x);
+}
+
+static void volume_slide_finished(lv_anim_t *animation) {
+    if (animation->end_value == HG_DISP_HOR_RES) {
+        lv_obj_add_flag(volume_root, LV_OBJ_FLAG_HIDDEN);
+    }
+}
+
+static void volume_slide(bool show) {
+    lv_anim_del(volume_root, volume_x);
+    lv_obj_clear_flag(volume_root, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_update_layout(volume_root);
+    lv_anim_t animation;
+    lv_anim_init(&animation);
+    lv_anim_set_var(&animation, volume_root);
+    lv_anim_set_exec_cb(&animation, volume_x);
+    lv_anim_set_values(&animation, lv_obj_get_x(volume_root),
+                        HG_DISP_HOR_RES - (show ? volume_width : 0));
+    lv_anim_set_time(&animation, HG_VOLUME_SLIDE_MS);
+    lv_anim_set_path_cb(&animation, lv_anim_path_ease_out);
+    lv_anim_set_ready_cb(&animation, volume_slide_finished);
+    lv_anim_start(&animation);
+}
+
+static void create_volume(void) {
+    volume_root = lv_obj_create(lv_layer_top());
+    lv_obj_remove_style_all(volume_root);
+    lv_obj_set_size(volume_root, volume_width, 160);
+    lv_obj_set_pos(volume_root, HG_DISP_HOR_RES, (HG_DISP_VER_RES - 160) / 2);
+    lv_obj_clear_flag(volume_root, LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_add_flag(volume_root, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_set_style_bg_opa(volume_root, LV_OPA_COVER, 0);
+    volume_bar = lv_bar_create(volume_root);
+    lv_obj_remove_style_all(volume_bar);
+    lv_obj_set_size(volume_bar, 8, 128);
+    lv_obj_align(volume_bar, LV_ALIGN_TOP_MID, 0, 4);
+    lv_obj_clear_flag(volume_bar, LV_OBJ_FLAG_CLICKABLE);
+    lv_bar_set_range(volume_bar, 0, 100);
+    lv_obj_set_style_bg_opa(volume_bar, LV_OPA_30, LV_PART_MAIN);
+    lv_obj_set_style_bg_opa(volume_bar, LV_OPA_COVER, LV_PART_INDICATOR);
+    lv_obj_set_style_radius(volume_bar, 4, LV_PART_MAIN);
+    lv_obj_set_style_radius(volume_bar, 4, LV_PART_INDICATOR);
+    volume_icon = lv_label_create(volume_root);
+    lv_obj_set_style_text_font(volume_icon, HG_FONT_VOLUME_ICON, 0);
+    lv_label_set_text(volume_icon, HG_ICON_VOLUME_HIGH);
+    volume_icon_high = true;
+    lv_obj_align(volume_icon, LV_ALIGN_BOTTOM_MID, 0, -4);
+    lv_obj_clear_flag(volume_icon, LV_OBJ_FLAG_CLICKABLE);
+}
+
+void hg_overlays_set_volume(const hg_volume_snapshot_t *volume) {
+    bool show = volume->visible && mode == OVERLAY_NONE;
+    if (!volume_root && !show) {
+        return;
+    }
+    if (!volume_root) {
+        create_volume();
+    }
+    if (show) {
+        lv_color_t fg = hg_theme_fg(), bg = hg_theme_bg();
+        if (!volume_colors_valid || lv_color_to32(fg) != lv_color_to32(volume_fg) ||
+            lv_color_to32(bg) != lv_color_to32(volume_bg)) {
+            volume_colors_valid = true;
+            volume_fg = fg;
+            volume_bg = bg;
+            lv_obj_set_style_bg_color(volume_root, bg, 0);
+            lv_obj_set_style_bg_color(volume_bar, fg, LV_PART_MAIN);
+            lv_obj_set_style_bg_color(volume_bar, fg, LV_PART_INDICATOR);
+            lv_obj_set_style_text_color(volume_icon, fg, 0);
+        }
+        lv_bar_set_value(volume_bar, volume->volume_pct, LV_ANIM_OFF);
+        bool high = volume->volume_pct > 50;
+        if (high != volume_icon_high) {
+            volume_icon_high = high;
+            lv_label_set_text(volume_icon, high ? HG_ICON_VOLUME_HIGH : HG_ICON_VOLUME_LOW);
+        }
+    }
+    if (!show && (volume->dismiss_immediately || mode != OVERLAY_NONE)) {
+        lv_anim_del(volume_root, volume_x);
+        lv_obj_add_flag(volume_root, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_set_x(volume_root, HG_DISP_HOR_RES);
+    } else if (show != volume_shown) {
+        volume_slide(show);
+    }
+    volume_shown = show;
+}
+
+bool hg_overlays_volume_animating(void) {
+    return volume_root && lv_anim_get(volume_root, volume_x) != NULL;
+}
+
+#ifdef HG_RUNTIME_TEST
+bool hg_overlays_test_volume(int *x, int *value) {
+    if (volume_root) {
+        lv_obj_update_layout(volume_root);
+    }
+    *x = volume_root ? lv_obj_get_x(volume_root) : HG_DISP_HOR_RES;
+    *value = volume_bar ? lv_bar_get_value(volume_bar) : 0;
+    return volume_shown;
+}
+
+lv_obj_t *hg_overlays_test_volume_root(void) {
+    return volume_root;
+}
+#endif
 
 static lv_obj_t *make_label(const lv_font_t *font) {
     lv_obj_t *label = lv_label_create(root);
@@ -155,6 +271,9 @@ static void show_confirm(const hg_alarm_snapshot_t *alarm) {
 }
 
 void hg_overlays_init(void) {
+    volume_root = volume_bar = volume_icon = NULL;
+    volume_shown = false;
+    volume_colors_valid = false;
     root = icon_label = title_label = time_label = NULL;
     touch_icon = touch_text = knob_icon = knob_text = NULL;
     mode = OVERLAY_NONE;

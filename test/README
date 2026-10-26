@@ -100,6 +100,19 @@ has been verified by it.
   cover silent detents, ignored/blocked/stale/generation-invalid input, wake-only
   holds/movement/touch, other pages, snooze and dismissal. Test-only logical input time avoids
   waiting for long display timeouts; the real LVGL blink timer is also exercised.
+- `volume_tests.cpp`: 5-point/coalesced/extreme turns, clamps, exact three-second
+  expiry and wraparound, blocked/stale/generation-invalid input, page/ringing
+  isolation, snoozed adjustment with base-time persistence, legacy/default/invalid
+  volume records, debounced volume-only saves, scaled PCM at minimum/default/
+  maximum, unchanged cues, immediate app handoff, editing isolation, panel
+  geometry/icon/theme (including low/high glyphs at the 50/55% boundary),
+  animation reversal and immediate cancellation.
+  Invalid-record/size/volume logs are expected only in the named record test.
+- `stress_tests.cpp` also reports `VOLUME LOAD`: repeated panel entry/exit under
+  combined sensor/network/CPU load. Require >24 rendered frames, frame maximum
+  <=50,000 us, capture <=10,000 us, zero input overflows and audio error deltas,
+  and sensor/network delay evidence >200,000 us. The panel's animated frames use
+  the same display-completion timing instrumentation as page slides.
 - Synthetic input uses an explicit manual source after startup. Hardware capture
   and its timing/stack diagnostics continue running; physical input is not
   replayed into synthetic gesture tests. Short presses include a release.
@@ -144,7 +157,7 @@ This is hardware regression evidence, not a new automated Unity case.
 Require the expected number of executed cases, **zero failures**, successful
 restoration, and actual timing samples. A reset/panic, watchdog message, silent
 serial timeout, ignored suite, or missing metrics is not a pass.
-The current suite contains 40 cases.
+The current suite contains 47 cases.
 
 1. **FRAME** reports complete rendered-frame gaps during slides, not average
    idle-loop time. Both baseline and loaded series must have more than 24 samples,
@@ -210,6 +223,18 @@ the model). The test suite does not yet drive an SK6812 or SEN66.
 
 After the automated suite restores normal firmware:
 
+- On the clock page, turn both directions: each physical detent should change
+  alarm volume by five points and show a vertical right-edge bar with speaker
+  icon, no percentage, filling upward. Check quiet adjustment, 5/100 limits,
+  refresh at limits, three-second slide-out and reversal during slide-out.
+  Confirm clock readability and nighttime red styling.
+- Navigate or enter time editing with the bar visible: it must disappear
+  immediately. Rotation in time editing must change time only; other pages and
+  ringing must not adjust volume. While snoozed, wait for confirmation to clear,
+  then adjust volume; a button press must still dismiss snooze as before.
+- Allow the asynchronous save, restart normal firmware and verify the bar
+  remembers its level without changing alarm time/enabled state. Do not use
+  real user-settings NVS writes in automated tests for this check.
 - On the clock page, hold for one second and release. Only the alarm minutes
   should flash. Rotate across an hour boundary, short-press to select hours,
   check noon/midnight am/pm, then hold again to save.
@@ -237,6 +262,35 @@ After the automated suite restores normal firmware:
   adjustments must be recorded separately from automated passes.
 
 ## Reference measurements
+
+The clock-volume implementation, including the two-state speaker icon, passed
+all 47 cases on the ESP32-S3 clock on COM4 (test exit 0; normal-firmware build/
+restoration exit 0). Baseline/loaded slide series each contained 96 samples with
+p95 33 ms and maxima 32.389 / 32.321 ms. Loaded capture maximum was 5.501 ms;
+sensor/network worker maxima were 257.129 / 271.256 ms, with free stacks of
+1,128 / 2,552 / 3,740 bytes (input/sensor/network). Volume animation under combined
+load rendered 100 frames with p95 33 ms, maximum 45.063 ms and capture maximum
+5.489 ms. Audio start/stop acknowledgement was 43 / 5 ms. Alarm/cue loaded frame
+maxima were 32.565 / 32.664 ms, with zero underruns/write errors and 2,376 bytes
+audio stack free. Cue load observed 12 starts and 11 drained completions; longest
+individual cue completion was 317 ms. Four scratch saves passed, longest
+22.056 ms, with capture/frame maxima 5.488 / 32.291 ms; probe cleanup passed.
+
+The user confirmed physical panel presentation, unchanged controls, and volume
+retention across restart before the final two-state-icon refinement. Low/high
+glyph selection at 5/50/55/100% is automated; the final glyph change has not yet
+received separate visual confirmation.
+
+Retained development failure evidence: the initial panel reapplied LVGL styles
+each loop and kept its off-screen object unhidden, causing ~64 ms slide gaps and
+an editor hold regression. Caching colors and explicitly hiding inactive panel
+objects restored the existing limits and editor pass. The next run exposed a
+pending debounced volume save interfering with the subsequent scratch test's
+expected generation; the volume-load test now settles its fake-writer save before
+returning. That intermediate scratch run also observed a 93.154 ms write and
+27.292 ms capture gap, consistent with the retained flash-latency caveat below.
+Two subsequent complete runs passed all 47 cases, including scratch timing.
+No settings erasure, scratch overwrite, or relaxed thresholds were used.
 
 The final rounded-tap/warm-chime implementation passed all 40 cases on the
 ESP32-S3 clock on COM4 (test exit 0; normal-firmware restoration exit 0).

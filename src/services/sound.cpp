@@ -100,12 +100,14 @@ float hg_sound_gain_at(hg_sound_id_t id, uint32_t elapsed_frames, uint32_t sampl
     return gain;
 }
 
-bool hg_sound_player_start(hg_sound_player_t *player, hg_sound_id_t id, uint32_t sample_rate) {
+bool hg_sound_player_start(hg_sound_player_t *player, hg_sound_id_t id, uint32_t sample_rate,
+                           uint8_t alarm_volume_pct) {
     if (!player) {
         return false;
     }
     *player = {};
-    if (!hg_sound_available(id) || sample_rate != HG_AUDIO_SAMPLE_RATE) {
+    if (!hg_sound_available(id) || sample_rate != HG_AUDIO_SAMPLE_RATE ||
+        alarm_volume_pct < HG_ALARM_VOLUME_MIN_PCT || alarm_volume_pct > 100) {
         player->finished = true;
         return false;
     }
@@ -121,6 +123,7 @@ bool hg_sound_player_start(hg_sound_player_t *player, hg_sound_id_t id, uint32_t
     }
     player->loop = sound->loop;
     player->sample_rate = sample_rate;
+    player->alarm_volume_pct = alarm_volume_pct;
     return true;
 }
 
@@ -200,6 +203,10 @@ size_t hg_sound_player_render(hg_sound_player_t *player, int16_t *out, size_t fr
     float start = hg_sound_gain_at(player->id, player->elapsed, player->sample_rate);
     float end = hg_sound_gain_at(player->id, player->elapsed + (uint32_t)produced,
                                  player->sample_rate);
+    if (player->id == HG_SOUND_ALARM) {
+        start *= player->alarm_volume_pct / 100.0f;
+        end *= player->alarm_volume_pct / 100.0f;
+    }
     for (size_t i = 0; i < produced; ++i) {
         float gain = start + (end - start) * ((float)i / (float)produced);
         float value = out[i] * gain;

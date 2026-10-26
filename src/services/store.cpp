@@ -13,7 +13,7 @@ struct alarm_record_t {
     uint8_t enabled;
     uint8_t hour;
     uint8_t minute;
-    uint8_t reserved;
+    uint8_t volume_pct;
 };
 
 static const uint32_t record_magic = 0x48474131;
@@ -25,11 +25,48 @@ static bool flash_allowed = false;
 static bool request_seen = false;
 static TaskHandle_t worker = nullptr;
 
+static bool decode_record(const alarm_record_t &record, hg_alarm_snapshot_t *out) {
+    if (record.magic != record_magic || record.enabled > 1 ||
+        record.hour >= 24 || record.minute >= 60) {
+        HG_ERROR("store", "Invalid saved alarm record\n");
+        return false;
+    }
+    out->enabled = record.enabled != 0;
+    out->hour = record.hour;
+    out->minute = record.minute;
+    out->volume_pct = HG_ALARM_VOLUME_DEFAULT_PCT;
+    if (record.volume_pct != 0) {
+        if (record.volume_pct >= HG_ALARM_VOLUME_MIN_PCT && record.volume_pct <= 100 &&
+            record.volume_pct % HG_ALARM_VOLUME_STEP_PCT == 0) {
+            out->volume_pct = record.volume_pct;
+        } else {
+            HG_ERROR("store", "Invalid saved alarm volume; using default\n");
+        }
+    }
+    return true;
+}
+
 #ifdef HG_RUNTIME_TEST
 static bool fake_writer = false;
 static bool fake_failure = false;
 static uint32_t fake_delay_ms = 0;
 static bool scratch_writer = false;
+
+bool hg_store_test_decode_alarm(const uint8_t *bytes, size_t size, hg_alarm_snapshot_t *out) {
+    if (size != sizeof(alarm_record_t)) {
+        HG_ERROR("store", "Invalid saved alarm record size\n");
+        return false;
+    }
+    alarm_record_t record;
+    memcpy(&record, bytes, sizeof(record));
+    return decode_record(record, out);
+}
+
+void hg_store_test_get_desired(hg_alarm_snapshot_t *out) {
+    portENTER_CRITICAL(&mux);
+    *out = desired;
+    portEXIT_CRITICAL(&mux);
+}
 
 void hg_store_test_writer(uint32_t delay_ms, bool fail) {
     portENTER_CRITICAL(&mux);
@@ -73,7 +110,7 @@ static bool save_alarm(const hg_alarm_snapshot_t *in) {
         return false;
     }
     const alarm_record_t record = {record_magic, (uint8_t)in->enabled,
-                                   (uint8_t)in->hour, (uint8_t)in->minute, 0};
+                                   (uint8_t)in->hour, (uint8_t)in->minute, in->volume_pct};
     bool ok = prefs.putBytes(key, &record, sizeof(record)) == sizeof(record);
     prefs.end();
     return ok;
@@ -149,13 +186,8 @@ bool hg_store_load_alarm(hg_alarm_snapshot_t *out) {
         alarm_record_t record = {};
         found = prefs.getBytesLength("alarm_v1") == sizeof(record) &&
                 prefs.getBytes("alarm_v1", &record, sizeof(record)) == sizeof(record) &&
-                record.magic == record_magic && record.enabled <= 1 &&
-                record.hour < 24 && record.minute < 60;
-        if (found) {
-            out->enabled = record.enabled != 0;
-            out->hour = record.hour;
-            out->minute = record.minute;
-        } else {
+                decode_record(record, out);
+        if (!found) {
             HG_ERROR("store", "Invalid saved alarm record\n");
         }
     } else if (prefs.isKey("alarm_hr")) {
@@ -166,6 +198,7 @@ bool hg_store_load_alarm(hg_alarm_snapshot_t *out) {
             out->enabled = prefs.getBool("alarm_en", out->enabled);
             out->hour = hour;
             out->minute = minute;
+            out->volume_pct = HG_ALARM_VOLUME_DEFAULT_PCT;
         } else {
             HG_ERROR("store", "Invalid legacy alarm settings\n");
         }
@@ -175,13 +208,16 @@ bool hg_store_load_alarm(hg_alarm_snapshot_t *out) {
 }
 
 void hg_store_request_save_alarm(const hg_alarm_snapshot_t *in) {
-    if (!in || in->hour < 0 || in->hour >= 24 || in->minute < 0 || in->minute >= 60) {
+    if (!in || in->hour < 0 || in->hour >= 24 || in->minute < 0 || in->minute >= 60 ||
+        in->volume_pct < HG_ALARM_VOLUME_MIN_PCT || in->volume_pct > 100 ||
+        in->volume_pct % HG_ALARM_VOLUME_STEP_PCT != 0) {
         HG_ERROR("store", "Invalid alarm save request\n");
         return;
     }
     portENTER_CRITICAL(&mux);
     if (!request_seen || desired.enabled != in->enabled ||
-        desired.hour != in->hour || desired.minute != in->minute) {
+        desired.hour != in->hour || desired.minute != in->minute ||
+        desired.volume_pct != in->volume_pct) {
         desired = *in;
         request_seen = true;
         ++status.requested_generation;

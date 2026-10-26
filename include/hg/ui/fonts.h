@@ -21,6 +21,9 @@ LV_FONT_DECLARE(inter_14);
 #define HG_FONT_WIFI_ICON_SMALL  (&icons_14)
 #define HG_FONT_ALARM_ICON  (&icons_alarm_72)
 #define HG_FONT_ACTION_ICON  (&icons_36)
+#define HG_FONT_VOLUME_ICON  (&icons_14)
+#define HG_ICON_VOLUME_LOW   "\uE04D"
+#define HG_ICON_VOLUME_HIGH  "\uE050"
 
 /* Glyphs in icons_alarm_72 / icons_36 (Material Icons Outlined). */
 #define HG_ICON_ALARM      "\uE855"

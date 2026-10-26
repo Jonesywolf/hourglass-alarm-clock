@@ -103,9 +103,27 @@ and CPU budgets, and merge any LED worker's applied state into the same
   only the committed time is sent through the existing asynchronous save path.
   Saving a time matching the current minute does not ring immediately.
 - Outside editing, a short press on the clock page toggles alarm enabled on
-  **release**, not on button-down. Rotation does nothing yet; its clock-page
-  routing is reserved for future volume control. Other pages do not edit or
-  toggle the alarm with the encoder.
+  **release**, not on button-down. Other pages do not edit or toggle the alarm
+  with the encoder.
+
+**Alarm volume (clock page only, outside time editing):**
+
+- Rotate clockwise/counterclockwise to raise/lower the saved volume by 5 points
+  per detent, clamped to 5–100% (no mute). This works with the alarm enabled,
+  disabled, or snoozed, but not while ringing or a boot/alarm confirmation
+  overlay is visible. Snoozed adjustment resumes after confirmation clears.
+- A vertical bar with a speaker icon slides in from the right edge, then slides
+  out after three seconds without a turn. Turns at either limit refresh it too.
+  The icon has one wave at 5–50% and multiple waves at 55–100%, without extra animation.
+  Leaving the clock, entering time editing, or showing a blocking overlay
+  immediately cancels it. The panel follows nighttime colors and is not touchable.
+- Turning is silent: there is no preview or extra chime. All existing button,
+  time-editing, stop/snooze, and first-gesture-only-wakes behavior is unchanged.
+- Volume scales the whole 30-second alarm ramp. At 100%, speaker output ramps
+  from 5% to the new 80% cap. The initial 75% setting ramps from 3.75% to 60%,
+  retaining the previous final loudness. Alarm volume does not affect UI chimes.
+- Volume is saved asynchronously after adjustment stops and flash writes are
+  admitted; allow the save to complete before disconnecting power.
 
 **Quiet alarm feedback:**
 
@@ -194,7 +212,7 @@ be mono, 16-bit, `HG_AUDIO_SAMPLE_RATE`, and end in silence so the loop point is
 
 ## Persistence
 
-Alarm edits retain their debounce; enable changes request an asynchronous save.
+Alarm time/volume edits retain their debounce; enable changes request an asynchronous save.
 The store worker coalesces desired settings and tracks requested/saved generations,
 failures, pending/writing state, and write timing. An old completion cannot clear a
 newer pending save. Failures remain pending and retry with backoff.
@@ -202,6 +220,11 @@ newer pending save. Failures remain pending and retry with backoff.
 New saves use one validated `alarm_v1` blob in the existing `hg-store` namespace,
 avoiding partially updated hour/minute/enabled keys. Existing legacy settings are
 read and migrate on the next save.
+The blob's formerly reserved byte now stores volume; zero from older firmware
+means the 75% default. Invalid volume logs an error and uses that default without
+discarding valid time/enabled settings. Older firmware can still read the record,
+but saving with it resets the volume byte to zero. Volume saves during snooze
+retain the base alarm time, never the temporary snooze time.
 
 Flash-write admission is disabled during slides, recent interaction, and declared
 timing-sensitive effects. Flash/cache activity can stall **both cores**, so moving

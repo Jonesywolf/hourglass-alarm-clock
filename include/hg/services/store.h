@@ -2,6 +2,7 @@
 #define HG_SERVICES_STORE_H
 
 #include <stdbool.h>
+#include <stddef.h>
 
 #include "hg/types.h"
 
@@ -27,6 +28,8 @@ void hg_store_get_status(hg_store_status_t *out);
 #ifdef HG_RUNTIME_TEST
 void hg_store_test_writer(uint32_t delay_ms, bool fail);
 void hg_store_test_scratch(bool enabled);
+bool hg_store_test_decode_alarm(const uint8_t *bytes, size_t size, hg_alarm_snapshot_t *out);
+void hg_store_test_get_desired(hg_alarm_snapshot_t *out);
 #endif
 
 #endif

@@ -6,6 +6,7 @@
 #include <freertos/task.h>
 
 #include "hg/app.h"
+#include "hg/app/input_router.h"
 #include "hg/app/runtime.h"
 #include "hg/config.h"
 #include "hg/hal/display.h"
@@ -13,6 +14,7 @@
 #include "hg/services/effects.h"
 #include "hg/services/store.h"
 #include "hg/ui/navigator.h"
+#include "hg/ui/overlays.h"
 
 static StaticSemaphore_t cpu_done_state;
 static SemaphoreHandle_t cpu_done = nullptr;
@@ -78,7 +80,8 @@ static void transitions(bool loaded, hg_timing_stats_t *frames,
         uint32_t started = millis();
         while (hg_navigator_is_sliding() && millis() - started < 2000U) {
             if (loaded) {
-                hg_alarm_snapshot_t value = {true, false, 11, (int)(millis() % 60U)};
+                hg_alarm_snapshot_t value = {true, false, 11, (int)(millis() % 60U), false,
+                                             HG_ALARM_VOLUME_DEFAULT_PCT};
                 hg_store_request_save_alarm(&value);
             }
             if (cues) {
@@ -162,6 +165,67 @@ void test_combined_load_frame_timing(void) {
 }
 
 void test_ring_alarm_now(void);
+
+void test_volume_animation_under_load(void) {
+    hg_store_test_writer(0, false);
+    hg_alarm_set_enabled(false);
+    hg_app_test_hide_boot_overlay(true);
+    hg_navigator_show_page(HG_PAGE_CLOCK);
+    uint32_t started = millis();
+    while ((hg_navigator_is_sliding() || hg_overlays_alarm_visible()) &&
+           millis() - started < HG_ALARM_CONFIRM_MS + 2000U) {
+        hg_app_loop();
+    }
+    hg_input_router_init();
+    hg_runtime_test_manual_input(true);
+    hg_runtime_test_load(250, 250, 20);
+    bool cpu_started = start_cpu_load();
+    hg_runtime_diagnostics_t before, loaded;
+    hg_runtime_get_diagnostics(&before);
+    hg_display_reset_frame_timing();
+    hg_runtime_reset_diagnostics();
+    bool inputs_ok = true;
+    for (unsigned i = 0; i < 10; ++i) {
+        hg_input_event_t event = {millis(), hg_runtime_input_generation(), false, false,
+                                  i % 2 ? 1 : -1};
+        inputs_ok = hg_runtime_test_input(&event) && inputs_ok;
+        started = millis();
+        while (millis() - started < HG_VOLUME_SLIDE_MS + 60U) {
+            hg_app_loop();
+        }
+        hg_input_router_test_update(true, millis() + HG_VOLUME_HIDE_MS);
+        started = millis();
+        while (millis() - started < HG_VOLUME_SLIDE_MS + 60U) {
+            hg_app_loop();
+        }
+    }
+    hg_timing_stats_t frames;
+    hg_display_get_frame_timing(&frames);
+    hg_runtime_get_diagnostics(&loaded);
+    hg_runtime_test_load(0, 0, 0);
+    bool cpu_stopped = cpu_started && stop_cpu_load();
+    started = millis();
+    while (millis() - started < HG_ALARM_STORE_DEBOUNCE_MS + HG_STORE_QUIET_MS + 100U) {
+        hg_app_loop();
+    }
+    Serial.printf("VOLUME LOAD frames=%lu p95=%luus max=%luus capture=%luus sensor=%luus network=%luus underruns=%lu errors=%lu\n",
+                  (unsigned long)frames.samples,
+                  (unsigned long)hg_timing_percentile_us(&frames, 95),
+                  (unsigned long)frames.max_us, (unsigned long)loaded.capture_gap.max_us,
+                  (unsigned long)loaded.sensor_max_us, (unsigned long)loaded.network_max_us,
+                  (unsigned long)(loaded.audio_underruns - before.audio_underruns),
+                  (unsigned long)(loaded.audio_write_errors - before.audio_write_errors));
+    TEST_ASSERT_TRUE(cpu_stopped);
+    TEST_ASSERT_TRUE(inputs_ok);
+    TEST_ASSERT_GREATER_THAN_UINT32(24, frames.samples);
+    TEST_ASSERT_LESS_OR_EQUAL_UINT32(50000, frames.max_us);
+    TEST_ASSERT_LESS_OR_EQUAL_UINT32(10000, loaded.capture_gap.max_us);
+    TEST_ASSERT_EQUAL_UINT32(0, loaded.input_overflows);
+    TEST_ASSERT_GREATER_THAN_UINT32(200000, loaded.sensor_max_us);
+    TEST_ASSERT_GREATER_THAN_UINT32(200000, loaded.network_max_us);
+    TEST_ASSERT_EQUAL_UINT32(before.audio_underruns, loaded.audio_underruns);
+    TEST_ASSERT_EQUAL_UINT32(before.audio_write_errors, loaded.audio_write_errors);
+}
 
 void test_audio_cues_under_load(void) {
     hg_alarm_dismiss();
@@ -279,7 +343,7 @@ void test_real_nvs_admission_timing(void) {
     uint32_t longest_write_us = 0;
     bool saved_each = true;
     for (unsigned i = 0; i < 4; ++i) {
-        hg_alarm_snapshot_t value = {false, false, 12, (int)i};
+        hg_alarm_snapshot_t value = {false, false, 12, (int)i, false, HG_ALARM_VOLUME_DEFAULT_PCT};
         hg_store_request_save_alarm(&value);
         hg_store_get_status(&status);
         uint32_t target = status.requested_generation;

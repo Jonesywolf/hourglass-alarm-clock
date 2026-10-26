@@ -173,7 +173,7 @@ void test_save_coalescing_and_acknowledgement(void) {
     hg_store_test_writer(100, false);
     hg_store_status_t before, status;
     hg_store_get_status(&before);
-    hg_alarm_snapshot_t value = {true, false, 9, 1};
+    hg_alarm_snapshot_t value = {true, false, 9, 1, false, HG_ALARM_VOLUME_DEFAULT_PCT};
     hg_store_request_save_alarm(&value);
     value.minute = 2;
     hg_store_request_save_alarm(&value);
@@ -209,7 +209,7 @@ void test_save_coalescing_and_acknowledgement(void) {
 
 void test_save_retry_and_admission(void) {
     hg_store_test_writer(0, true);
-    hg_alarm_snapshot_t value = {true, false, 9, 4};
+    hg_alarm_snapshot_t value = {true, false, 9, 4, false, HG_ALARM_VOLUME_DEFAULT_PCT};
     hg_store_status_t before, status;
     hg_store_get_status(&before);
     hg_store_request_save_alarm(&value);

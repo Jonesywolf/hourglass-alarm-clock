@@ -51,6 +51,12 @@ typedef struct {
     int minute;
 } hg_alarm_edit_snapshot_t;
 
+typedef struct {
+    bool visible;
+    bool dismiss_immediately;
+    uint8_t volume_pct;
+} hg_volume_snapshot_t;
+
 typedef enum {
     HG_PAGE_CLOCK = 0,
     HG_PAGE_WEATHER,
@@ -92,6 +98,7 @@ typedef struct {
     int minute;
     /* While snoozed, hour/minute are the temporary ring time; the saved time is restored on dismiss. */
     bool snoozed;
+    uint8_t volume_pct;
 } hg_alarm_snapshot_t;
 
 typedef struct {

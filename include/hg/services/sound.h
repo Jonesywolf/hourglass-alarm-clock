@@ -31,11 +31,13 @@ typedef struct {
     uint32_t sample_rate;
     bool loop;
     bool finished;
+    uint8_t alarm_volume_pct;
 } hg_sound_player_t;
 
 hg_sound_id_t hg_sound_for_effects(const hg_effects_snapshot_t *effects);
 bool hg_sound_available(hg_sound_id_t id);
-bool hg_sound_player_start(hg_sound_player_t *player, hg_sound_id_t id, uint32_t sample_rate);
+bool hg_sound_player_start(hg_sound_player_t *player, hg_sound_id_t id, uint32_t sample_rate,
+                           uint8_t alarm_volume_pct = 100);
 /* Renders up to `frames` samples. Returns 0 once a non-looping sound has ended. */
 size_t hg_sound_player_render(hg_sound_player_t *player, int16_t *out, size_t frames);
 /* Alarm ramp times fade-in, or the cue gain cap (the tone envelope is sample-local). */

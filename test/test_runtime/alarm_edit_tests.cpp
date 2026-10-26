@@ -285,10 +285,15 @@ void test_nighttime_wake_gestures(void) {
     step(1, false, true);
 
     enter_off();
+    int volume_before_wake = alarm().volume_pct;
     step(1, false, false, 10);
     TEST_ASSERT_EQUAL(HG_DISPLAY_MODE_RED, hg_display_mode_get());
     TEST_ASSERT_EQUAL(59, alarm().minute);
     TEST_ASSERT_EQUAL(HG_ALARM_EDIT_NONE, editor().field);
+    TEST_ASSERT_EQUAL(volume_before_wake, alarm().volume_pct);
+    hg_volume_snapshot_t volume;
+    hg_input_router_get_volume(&volume);
+    TEST_ASSERT_FALSE(volume.visible);
 
     enter_off();
     step(1, false, false, 0, true);

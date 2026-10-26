@@ -19,6 +19,25 @@ static bool button_down = false;
 static bool consume_button = false;
 static bool consume_touch = false;
 static bool press_allowed = false;
+static bool volume_allowed = true;
+static hg_volume_snapshot_t volume;
+static uint32_t last_volume_ms = 0;
+
+static void cancel_volume(void) {
+    volume.visible = false;
+    volume.dismiss_immediately = true;
+}
+
+void hg_input_router_set_volume_allowed(bool allowed) {
+    volume_allowed = allowed;
+    if (!allowed) {
+        cancel_volume();
+    }
+}
+
+void hg_input_router_get_volume(hg_volume_snapshot_t *out) {
+    *out = volume;
+}
 
 static bool editing(void) {
     return edit.field != HG_ALARM_EDIT_NONE;
@@ -68,7 +87,13 @@ static void short_action(uint32_t now) {
 
 static void clock_rotation(int32_t delta, uint32_t now) {
     if (!editing()) {
-        /* Idle clock rotation is reserved for future volume control. */
+        if (volume_allowed) {
+            hg_alarm_adjust_volume(delta);
+            hg_alarm_snapshot_t alarm;
+            hg_alarm_get_snapshot(&alarm);
+            volume = {true, false, alarm.volume_pct};
+            last_volume_ms = now;
+        }
         return;
     }
     int minutes = edit.hour * 60 + edit.minute;
@@ -88,6 +113,9 @@ void hg_input_router_init(void) {
     edit = {};
     last_encoder_ms = pressed_ms = button_sequence = input_generation = 0;
     button_down = consume_button = consume_touch = press_allowed = false;
+    volume_allowed = true;
+    volume = {};
+    last_volume_ms = 0;
 }
 
 void hg_input_router_get_alarm_edit(hg_alarm_edit_snapshot_t *out) {
@@ -97,6 +125,7 @@ void hg_input_router_get_alarm_edit(hg_alarm_edit_snapshot_t *out) {
 static bool update(bool navigation_allowed, uint32_t now, bool realtime) {
     bool activity = false;
     uint32_t generation = hg_runtime_input_generation();
+    bool generation_changed = generation != input_generation;
     bool clock_allowed = navigation_allowed && !hg_navigator_is_sliding() &&
                          hg_navigator_current() == HG_PAGE_CLOCK;
     if (generation != input_generation || !clock_allowed ||
@@ -107,6 +136,9 @@ static bool update(bool navigation_allowed, uint32_t now, bool realtime) {
     }
     if (editing() && !clock_allowed) {
         finish_edit(now);
+    }
+    if (!clock_allowed || generation_changed) {
+        cancel_volume();
     }
 
     for (unsigned i = 0; i < HG_INPUT_QUEUE_CAPACITY; ++i) {
@@ -191,7 +223,8 @@ static bool update(bool navigation_allowed, uint32_t now, bool realtime) {
             consume_touch = false;
         }
         if (event.encoder_delta && !woke && !consume_touch && allowed &&
-            !hg_navigator_is_sliding() && !alarm.ringing && !alarm.snoozed &&
+            !hg_navigator_is_sliding() && !alarm.ringing &&
+            (!alarm.snoozed || !editing()) &&
             !(button_down && consume_button && !editing())) {
             switch (hg_navigator_current()) {
                 case HG_PAGE_CLOCK:
@@ -244,6 +277,13 @@ static bool update(bool navigation_allowed, uint32_t now, bool realtime) {
         } else if (now - last_encoder_ms >= HG_ALARM_EDIT_IDLE_MS) {
             finish_edit(now);
         }
+    }
+    if (editing() || !navigation_allowed || hg_navigator_is_sliding() ||
+        hg_navigator_current() != HG_PAGE_CLOCK || alarm.ringing || !volume_allowed) {
+        cancel_volume();
+    } else if (volume.visible && now - last_volume_ms >= HG_VOLUME_HIDE_MS) {
+        volume.visible = false;
+        volume.dismiss_immediately = false;
     }
     return activity;
 }

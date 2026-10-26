@@ -10,6 +10,7 @@ void hg_alarm_set_time(int hour, int minute);
 /* UI owner suppresses scheduling while a draft is edited; ending editing skips the current window. */
 void hg_alarm_set_editing(bool editing);
 void hg_alarm_set_enabled(bool enabled);
+void hg_alarm_adjust_volume(int32_t detents);
 void hg_alarm_dismiss(void);
 /* Rings again HG_ALARM_SNOOZE_MIN minutes from now; the saved time is untouched. No-op unless ringing. */
 void hg_alarm_snooze(void);

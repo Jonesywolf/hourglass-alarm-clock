@@ -20,7 +20,8 @@ static uint32_t acted_ms = 0;
 static bool editing = false;
 
 static void hg_alarm_request_save(void) {
-    hg_alarm_snapshot_t saved = {snapshot.enabled, false, base_hour, base_minute, false};
+    hg_alarm_snapshot_t saved = {snapshot.enabled, false, base_hour, base_minute, false,
+                                 snapshot.volume_pct};
     hg_store_request_save_alarm(&saved);
 }
 
@@ -45,6 +46,7 @@ static void hg_alarm_stop_ringing(void) {
 void hg_alarm_init(void) {
     snapshot = {};
     snapshot.hour = 7;
+    snapshot.volume_pct = HG_ALARM_VOLUME_DEFAULT_PCT;
     hg_store_load_alarm(&snapshot);
     snapshot.ringing = false;
     snapshot.snoozed = false;
@@ -129,6 +131,20 @@ void hg_alarm_set_enabled(bool enabled) {
         fired_this_window = false;
     }
     hg_alarm_request_save();
+}
+
+void hg_alarm_adjust_volume(int32_t detents) {
+    int64_t volume = snapshot.volume_pct + (int64_t)detents * HG_ALARM_VOLUME_STEP_PCT;
+    if (volume < HG_ALARM_VOLUME_MIN_PCT) {
+        volume = HG_ALARM_VOLUME_MIN_PCT;
+    } else if (volume > 100) {
+        volume = 100;
+    }
+    if (volume != snapshot.volume_pct) {
+        snapshot.volume_pct = (uint8_t)volume;
+        dirty = true;
+        last_change_ms = millis();
+    }
 }
 
 void hg_alarm_dismiss(void) {
