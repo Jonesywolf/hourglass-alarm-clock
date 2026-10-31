@@ -299,6 +299,12 @@ static void check_audio_playback_under_load(void) {
                   (unsigned long)frames.max_us, (unsigned long)loaded.capture_gap.max_us,
                   (unsigned long)underruns, (unsigned long)errors,
                   (unsigned long)loaded.stack_free_bytes[3]);
+    hg_display_transfer_timing_t transfer;
+    hg_display_get_transfer_timing(&transfer);
+    Serial.printf("AUDIO LOAD UI work max=%luus gap max=%luus transfer max=%luus pixels=%lu\n",
+                  (unsigned long)loaded.ui_work.max_us, (unsigned long)loaded.ui_gap.max_us,
+                  (unsigned long)transfer.max_frame_transfer_us,
+                  (unsigned long)transfer.max_frame_pixels);
     hg_alarm_dismiss();
     hg_alarm_set_enabled(false);
     uint32_t settle = millis();

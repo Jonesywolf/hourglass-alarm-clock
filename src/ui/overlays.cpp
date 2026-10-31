@@ -13,10 +13,13 @@ static lv_obj_t *root;
 static lv_obj_t *icon_label;
 static lv_obj_t *title_label;
 static lv_obj_t *time_label;
-static lv_obj_t *touch_icon;
 static lv_obj_t *touch_text;
-static lv_obj_t *knob_icon;
+static lv_obj_t *touch_arrow;
 static lv_obj_t *knob_text;
+static lv_obj_t *knob_arrow;
+static int32_t alarm_icon_opacity = LV_OPA_COVER;
+static uint32_t alarm_refresh_period = 0;
+static uint32_t alarm_animation_period = 0;
 static bool prev_snoozed = false;
 static int shown_key = -1;
 static uint32_t confirm_until_ms = 0;
@@ -28,6 +31,58 @@ static bool volume_colors_valid = false;
 static bool volume_icon_high = true;
 static lv_color_t volume_fg, volume_bg;
 static const int volume_width = 28;
+static const lv_point_t touch_arrow_points[] = {{14, 36}, {14, 2}, {4, 13}, {14, 2}, {24, 13}};
+static const lv_point_t knob_arrow_points[] = {{2, 13}, {36, 13}, {25, 3}, {36, 13}, {25, 23}};
+
+static void pulse_alarm_icon(void *object, int32_t opacity) {
+    const int32_t step = 8;
+    int32_t level = LV_OPA_TRANSP + ((opacity - LV_OPA_TRANSP + step / 2) / step) * step;
+    if (level > LV_OPA_COVER) {
+        level = LV_OPA_COVER;
+    } else if (level < LV_OPA_60) {
+        level = LV_OPA_60;
+    }
+    if (level != alarm_icon_opacity) {
+        alarm_icon_opacity = level;
+        lv_obj_set_style_text_opa(static_cast<lv_obj_t *>(object), level, 0);
+    }
+}
+
+static void start_alarm_pulse(void) {
+    lv_timer_t *refresh = _lv_disp_get_refr_timer(lv_obj_get_disp(icon_label));
+    lv_timer_t *animations = lv_anim_get_timer();
+    alarm_refresh_period = refresh->period;
+    alarm_animation_period = animations->period;
+    // Mixed partial/full paints need headroom before the next display transfer.
+    lv_timer_set_period(refresh, 16);
+    lv_timer_set_period(animations, 16);
+    alarm_icon_opacity = LV_OPA_COVER;
+    lv_obj_set_style_text_opa(icon_label, LV_OPA_COVER, 0);
+    lv_anim_t animation;
+    lv_anim_init(&animation);
+    lv_anim_set_var(&animation, icon_label);
+    lv_anim_set_exec_cb(&animation, pulse_alarm_icon);
+    lv_anim_set_values(&animation, LV_OPA_COVER, LV_OPA_60);
+    lv_anim_set_time(&animation, 1000);
+    lv_anim_set_playback_time(&animation, 1000);
+    lv_anim_set_repeat_count(&animation, LV_ANIM_REPEAT_INFINITE);
+    lv_anim_set_path_cb(&animation, lv_anim_path_ease_in_out);
+    lv_anim_start(&animation);
+}
+
+static void stop_alarm_pulse(void) {
+    if (icon_label) {
+        lv_anim_del(icon_label, pulse_alarm_icon);
+        lv_obj_set_style_text_opa(icon_label, LV_OPA_COVER, 0);
+        if (alarm_refresh_period) {
+            lv_timer_set_period(_lv_disp_get_refr_timer(lv_obj_get_disp(icon_label)),
+                                alarm_refresh_period);
+            lv_timer_set_period(lv_anim_get_timer(), alarm_animation_period);
+            alarm_refresh_period = alarm_animation_period = 0;
+        }
+    }
+    alarm_icon_opacity = LV_OPA_COVER;
+}
 
 static void volume_x(void *object, int32_t x) {
     lv_obj_t *panel = static_cast<lv_obj_t *>(object);
@@ -138,6 +193,10 @@ bool hg_overlays_test_volume(int *x, int *value) {
 lv_obj_t *hg_overlays_test_volume_root(void) {
     return volume_root;
 }
+
+lv_obj_t *hg_overlays_test_alarm_root(void) {
+    return root;
+}
 #endif
 
 static lv_obj_t *make_label(const lv_font_t *font) {
@@ -147,12 +206,26 @@ static lv_obj_t *make_label(const lv_font_t *font) {
     return label;
 }
 
+static lv_obj_t *make_arrow(const lv_point_t *points, uint16_t point_count,
+                            lv_align_t align, lv_coord_t x, lv_coord_t y) {
+    lv_obj_t *arrow = lv_line_create(root);
+    lv_obj_remove_style_all(arrow);
+    lv_line_set_points(arrow, points, point_count);
+    lv_obj_set_style_line_width(arrow, 3, 0);
+    lv_obj_set_style_line_rounded(arrow, true, 0);
+    lv_obj_clear_flag(arrow, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_align(arrow, align, x, y);
+    return arrow;
+}
+
 static void destroy(void) {
+    stop_alarm_pulse();
     if (root) {
         lv_obj_del(root);
     }
     root = icon_label = title_label = time_label = NULL;
-    touch_icon = touch_text = knob_icon = knob_text = NULL;
+    touch_text = touch_arrow = NULL;
+    knob_text = knob_arrow = NULL;
     mode = OVERLAY_NONE;
 }
 
@@ -177,9 +250,9 @@ static void apply_colors(void) {
     lv_obj_set_style_text_color(icon_label, alarm, 0);
     lv_obj_set_style_text_color(time_label, alarm, 0);
     lv_obj_set_style_text_color(title_label, fg, 0);
-    lv_obj_set_style_text_color(touch_icon, fg, 0);
+    lv_obj_set_style_line_color(touch_arrow, hg_theme_muted(), 0);
     lv_obj_set_style_text_color(touch_text, fg, 0);
-    lv_obj_set_style_text_color(knob_icon, fg, 0);
+    lv_obj_set_style_line_color(knob_arrow, hg_theme_muted(), 0);
     lv_obj_set_style_text_color(knob_text, fg, 0);
 }
 
@@ -203,19 +276,19 @@ static void create(void) {
     time_label = make_label(HG_FONT_ALARM);
     lv_obj_align(time_label, LV_ALIGN_TOP_MID, 0, 104);
 
-    touch_icon = make_label(HG_FONT_ACTION_ICON);
-    lv_label_set_text(touch_icon, HG_ICON_SNOOZE);
-    lv_obj_align(touch_icon, LV_ALIGN_BOTTOM_MID, -80, -44);
     touch_text = make_label(HG_FONT_STATUS);
-    lv_label_set_text_fmt(touch_text, "Tap: snooze %d min", HG_ALARM_SNOOZE_MIN);
-    lv_obj_align(touch_text, LV_ALIGN_BOTTOM_MID, -80, -20);
+    lv_label_set_text(touch_text, "Tap to snooze");
+    lv_obj_align(touch_text, LV_ALIGN_TOP_MID, -24, 50);
+    touch_arrow = make_arrow(touch_arrow_points,
+                             sizeof(touch_arrow_points) / sizeof(touch_arrow_points[0]),
+                             LV_ALIGN_TOP_MID, -24, 8);
 
-    knob_icon = make_label(HG_FONT_ACTION_ICON);
-    lv_label_set_text(knob_icon, HG_ICON_ALARM_OFF);
-    lv_obj_align(knob_icon, LV_ALIGN_BOTTOM_MID, 80, -44);
     knob_text = make_label(HG_FONT_STATUS);
-    lv_label_set_text(knob_text, "Press knob: stop");
-    lv_obj_align(knob_text, LV_ALIGN_BOTTOM_MID, 80, -20);
+    lv_label_set_text(knob_text, "Press to stop");
+    lv_obj_align(knob_text, LV_ALIGN_RIGHT_MID, -8, 34);
+    knob_arrow = make_arrow(knob_arrow_points,
+                            sizeof(knob_arrow_points) / sizeof(knob_arrow_points[0]),
+                            LV_ALIGN_RIGHT_MID, -8, -3);
     have_last_colors = false;
     apply_colors();
 }
@@ -227,7 +300,9 @@ static void set_time_text(const hg_alarm_snapshot_t *alarm) {
     }
     lv_label_set_text_fmt(time_label, "%d:%02d %s", hour12, alarm->minute,
                           alarm->hour >= 12 ? "pm" : "am");
-    lv_obj_align(time_label, LV_ALIGN_TOP_MID, 0, 104);
+    lv_obj_align(time_label, LV_ALIGN_TOP_MID,
+                 mode == OVERLAY_RINGING ? -24 : 0,
+                 mode == OVERLAY_RINGING ? 163 : 104);
 }
 
 static void show_ringing(const hg_alarm_snapshot_t *alarm) {
@@ -235,41 +310,48 @@ static void show_ringing(const hg_alarm_snapshot_t *alarm) {
     if (mode == OVERLAY_RINGING && key == shown_key) {
         return;
     }
+    bool was_ringing = mode == OVERLAY_RINGING;
     shown_key = key;
     if (!root) {
         create();
     }
     mode = OVERLAY_RINGING;
-    lv_label_set_text(title_label, alarm->snoozed ? "Snoozed alarm" : "Alarm");
-    lv_obj_align(title_label, LV_ALIGN_TOP_MID, 0, 84);
+    lv_obj_add_flag(title_label, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_align(icon_label, LV_ALIGN_TOP_MID, -24, 80);
     set_time_text(alarm);
     lv_obj_clear_flag(time_label, LV_OBJ_FLAG_HIDDEN);
-    lv_obj_clear_flag(touch_icon, LV_OBJ_FLAG_HIDDEN);
     lv_obj_clear_flag(touch_text, LV_OBJ_FLAG_HIDDEN);
-    lv_obj_clear_flag(knob_icon, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_clear_flag(touch_arrow, LV_OBJ_FLAG_HIDDEN);
     lv_obj_clear_flag(knob_text, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_clear_flag(knob_arrow, LV_OBJ_FLAG_HIDDEN);
+    if (!was_ringing) {
+        start_alarm_pulse();
+    }
     lv_obj_move_foreground(root);
 }
 
 static void show_confirm(const hg_alarm_snapshot_t *alarm) {
+    stop_alarm_pulse();
     if (!root) {
         create();
     }
     mode = OVERLAY_CONFIRM;
+    lv_obj_align(icon_label, LV_ALIGN_TOP_MID, 0, 14);
     confirm_until_ms = lv_tick_get() + HG_ALARM_CONFIRM_MS;
     lv_label_set_text(title_label, alarm->snoozed ? "Snoozed until" :
                                    alarm->enabled ? "Next alarm" : "Alarm off");
     lv_obj_align(title_label, LV_ALIGN_TOP_MID, 0, 84);
+    lv_obj_clear_flag(title_label, LV_OBJ_FLAG_HIDDEN);
     if (alarm->enabled) {
         set_time_text(alarm);
         lv_obj_clear_flag(time_label, LV_OBJ_FLAG_HIDDEN);
     } else {
         lv_obj_add_flag(time_label, LV_OBJ_FLAG_HIDDEN);
     }
-    lv_obj_add_flag(touch_icon, LV_OBJ_FLAG_HIDDEN);
     lv_obj_add_flag(touch_text, LV_OBJ_FLAG_HIDDEN);
-    lv_obj_add_flag(knob_icon, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_add_flag(touch_arrow, LV_OBJ_FLAG_HIDDEN);
     lv_obj_add_flag(knob_text, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_add_flag(knob_arrow, LV_OBJ_FLAG_HIDDEN);
     lv_obj_move_foreground(root);
 }
 
@@ -278,7 +360,8 @@ void hg_overlays_init(void) {
     volume_shown = false;
     volume_colors_valid = false;
     root = icon_label = title_label = time_label = NULL;
-    touch_icon = touch_text = knob_icon = knob_text = NULL;
+    touch_text = touch_arrow = NULL;
+    knob_text = knob_arrow = NULL;
     mode = OVERLAY_NONE;
     prev_snoozed = false;
 }

@@ -16,6 +16,7 @@ bool hg_overlays_volume_animating(void);
 #include <lvgl.h>
 bool hg_overlays_test_volume(int *x, int *value);
 lv_obj_t *hg_overlays_test_volume_root(void);
+lv_obj_t *hg_overlays_test_alarm_root(void);
 #endif
 
 #endif

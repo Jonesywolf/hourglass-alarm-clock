@@ -178,8 +178,12 @@ that interprets it; all of it works during slides and the boot overlay):
   alarm. The entire stopping press/hold is consumed. Idle clock-page short presses
   toggle enabled and save on release.
 - The alarm screen is a transient overlay (`ui/overlays.*`, LVGL top layer) with
-  snooze/stop hints. After an action it briefly confirms "Snoozed until", "Next
-  alarm" or "Alarm off".
+  one large alarm icon, the alarm time, and two directional hints: "Tap to snooze"
+  with an upward arrow toward the top touch control, and "Press to stop" with a
+  rightward arrow toward the encoder. The icon gently pulses while ringing,
+  remaining visible throughout; the time and hints stay still. After an action,
+  the hints disappear and the icon stops pulsing while it briefly confirms
+  "Snoozed until", "Next alarm" or "Alarm off".
 
 **Audio path.** `effects` generation + phase → `hg_sound_for_effects()` → an
 `hg_audio_command_t` in a length-one mailbox → the audio worker → `hal/speaker`

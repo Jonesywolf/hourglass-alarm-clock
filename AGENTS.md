@@ -2,6 +2,15 @@
 
 Hour-glass alarm-clock firmware for ESP32-S3 + LVGL 8. Keep modules small so an agent can edit one file without loading the whole tree.
 
+## Physical form and interaction
+
+- The clock sits inside an inverted glass cube candle holder with its bottom open.
+- The display is on the front face, the rotary encoder is on the right face, and the
+  capacitive touch button is on the top face.
+- UI guidance should orient the user to those physical controls: point toward the
+  top edge for touch and the right edge for the encoder. Keep the clock's
+  personality warm and calm, with restrained motion.
+
 ## Architecture
 
 ```

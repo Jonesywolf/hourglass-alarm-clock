@@ -11,8 +11,10 @@
 #include "hg/services/sound.h"
 #include "hg/services/store.h"
 #include "hg/services/time.h"
+#include "hg/ui/fonts.h"
 #include "hg/ui/overlays.h"
 #include "hg/ui/navigator.h"
+#include "hg/ui/theme.h"
 
 static void run_app_ms(uint32_t duration_ms) {
     uint32_t started = millis();
@@ -60,6 +62,126 @@ static void wait_overlay_gone(void) {
         hg_app_loop();
     }
     TEST_ASSERT_FALSE(hg_overlays_alarm_visible());
+    TEST_ASSERT_NULL(hg_overlays_test_alarm_root());
+}
+
+static void check_overlay_geometry(lv_obj_t *root) {
+    lv_obj_update_layout(root);
+    lv_area_t bounds;
+    lv_obj_get_coords(root, &bounds);
+    TEST_ASSERT_EQUAL(HG_DISP_HOR_RES, lv_obj_get_width(root));
+    TEST_ASSERT_EQUAL(HG_DISP_VER_RES, lv_obj_get_height(root));
+    for (uint32_t i = 0; i < lv_obj_get_child_cnt(root); ++i) {
+        lv_obj_t *child = lv_obj_get_child(root, i);
+        if (lv_obj_has_flag(child, LV_OBJ_FLAG_HIDDEN)) {
+            continue;
+        }
+        lv_area_t area;
+        lv_obj_get_coords(child, &area);
+        TEST_ASSERT_TRUE(area.x1 >= bounds.x1 && area.y1 >= bounds.y1 &&
+                         area.x2 <= bounds.x2 && area.y2 <= bounds.y2);
+        for (uint32_t j = 0; j < i; ++j) {
+            lv_obj_t *other = lv_obj_get_child(root, j);
+            if (lv_obj_has_flag(other, LV_OBJ_FLAG_HIDDEN)) {
+                continue;
+            }
+            lv_area_t other_area;
+            lv_obj_get_coords(other, &other_area);
+            TEST_ASSERT_TRUE_MESSAGE(area.x2 < other_area.x1 || other_area.x2 < area.x1 ||
+                                     area.y2 < other_area.y1 || other_area.y2 < area.y1,
+                                     "alarm overlay objects overlap");
+        }
+    }
+}
+
+static void check_ringing_overlay(const hg_alarm_snapshot_t &alarm) {
+    lv_obj_t *root = hg_overlays_test_alarm_root();
+    TEST_ASSERT_NOT_NULL(root);
+    TEST_ASSERT_EQUAL(7, lv_obj_get_child_cnt(root));
+    const uint32_t label_indices[] = {0, 1, 2, 3, 5};
+    for (uint32_t index : label_indices) {
+        TEST_ASSERT_TRUE(lv_obj_check_type(lv_obj_get_child(root, index), &lv_label_class));
+    }
+    lv_obj_t *icon = lv_obj_get_child(root, 0);
+    TEST_ASSERT_EQUAL_STRING(HG_ICON_ALARM, lv_label_get_text(icon));
+    TEST_ASSERT_TRUE(lv_obj_get_style_text_font(icon, 0) == HG_FONT_ALARM_ICON);
+    TEST_ASSERT_TRUE(lv_obj_has_flag(lv_obj_get_child(root, 1), LV_OBJ_FLAG_HIDDEN));
+    char expected[16];
+    int hour12 = alarm.hour % 12;
+    snprintf(expected, sizeof(expected), "%d:%02d %s", hour12 ? hour12 : 12,
+             alarm.minute, alarm.hour >= 12 ? "pm" : "am");
+    TEST_ASSERT_EQUAL_STRING(expected, lv_label_get_text(lv_obj_get_child(root, 2)));
+    TEST_ASSERT_EQUAL_STRING("Tap to snooze", lv_label_get_text(lv_obj_get_child(root, 3)));
+    TEST_ASSERT_EQUAL_STRING("Press to stop", lv_label_get_text(lv_obj_get_child(root, 5)));
+    for (uint32_t i = 0; i < 7; ++i) {
+        if (i != 1) {
+            TEST_ASSERT_FALSE(lv_obj_has_flag(lv_obj_get_child(root, i), LV_OBJ_FLAG_HIDDEN));
+        }
+    }
+    for (uint32_t index : {4U, 6U}) {
+        lv_obj_t *arrow = lv_obj_get_child(root, index);
+        TEST_ASSERT_TRUE(lv_obj_check_type(arrow, &lv_line_class));
+        TEST_ASSERT_FALSE(lv_obj_has_flag(arrow, LV_OBJ_FLAG_CLICKABLE));
+        TEST_ASSERT_EQUAL_HEX32(lv_color_to32(hg_theme_muted()),
+                              lv_color_to32(lv_obj_get_style_line_color(arrow, 0)));
+        const lv_line_t *line = reinterpret_cast<const lv_line_t *>(arrow);
+        const lv_point_t *points = line->point_array;
+        TEST_ASSERT_EQUAL(5, line->point_num);
+        TEST_ASSERT_TRUE(index == 4 ? points[1].y < points[0].y :
+                                     points[1].x > points[0].x);
+    }
+    TEST_ASSERT_EQUAL_HEX32(lv_color_to32(hg_theme_alarm()),
+                          lv_color_to32(lv_obj_get_style_text_color(icon, 0)));
+    TEST_ASSERT_EQUAL_HEX32(lv_color_to32(hg_theme_alarm()),
+                          lv_color_to32(lv_obj_get_style_text_color(lv_obj_get_child(root, 2), 0)));
+    for (uint32_t index : {3U, 5U}) {
+        TEST_ASSERT_EQUAL_HEX32(lv_color_to32(hg_theme_fg()),
+                              lv_color_to32(lv_obj_get_style_text_color(lv_obj_get_child(root, index), 0)));
+    }
+    check_overlay_geometry(root);
+}
+
+static void check_confirm_overlay(const char *title, bool enabled) {
+    lv_obj_t *root = hg_overlays_test_alarm_root();
+    TEST_ASSERT_NOT_NULL(root);
+    TEST_ASSERT_FALSE(lv_obj_has_flag(lv_obj_get_child(root, 1), LV_OBJ_FLAG_HIDDEN));
+    TEST_ASSERT_EQUAL_STRING(title, lv_label_get_text(lv_obj_get_child(root, 1)));
+    TEST_ASSERT_EQUAL(!enabled, lv_obj_has_flag(lv_obj_get_child(root, 2), LV_OBJ_FLAG_HIDDEN));
+    for (uint32_t i = 3; i < 7; ++i) {
+        TEST_ASSERT_TRUE(lv_obj_has_flag(lv_obj_get_child(root, i), LV_OBJ_FLAG_HIDDEN));
+    }
+    lv_obj_t *icon = lv_obj_get_child(root, 0);
+    TEST_ASSERT_NULL(lv_anim_get(icon, NULL));
+    TEST_ASSERT_EQUAL(LV_OPA_COVER, lv_obj_get_style_text_opa(icon, 0));
+    check_overlay_geometry(root);
+}
+
+static void check_alarm_pulse(const hg_alarm_snapshot_t &alarm) {
+    lv_obj_t *root = hg_overlays_test_alarm_root();
+    lv_obj_t *icon = lv_obj_get_child(root, 0);
+    TEST_ASSERT_NOT_NULL(lv_anim_get(icon, NULL));
+    TEST_ASSERT_EQUAL(16, _lv_disp_get_refr_timer(lv_obj_get_disp(icon))->period);
+    TEST_ASSERT_EQUAL(16, lv_anim_get_timer()->period);
+    int minimum = LV_OPA_COVER;
+    int maximum = LV_OPA_TRANSP;
+    uint32_t started = millis();
+    while (millis() - started < 2300U) {
+        hg_app_loop();
+        int opacity = lv_obj_get_style_text_opa(icon, 0);
+        TEST_ASSERT_TRUE(opacity >= LV_OPA_60 && opacity <= LV_OPA_COVER);
+        if (opacity < minimum) minimum = opacity;
+        if (opacity > maximum) maximum = opacity;
+        lv_anim_t *animation = lv_anim_get(icon, NULL);
+        TEST_ASSERT_NOT_NULL(animation);
+        int32_t phase = animation->act_time;
+        hg_overlays_set_alarm(&alarm);
+        TEST_ASSERT_TRUE(animation == lv_anim_get(icon, NULL));
+        TEST_ASSERT_EQUAL(phase, animation->act_time);
+        TEST_ASSERT_EQUAL(opacity, lv_obj_get_style_text_opa(icon, 0));
+    }
+    TEST_ASSERT_TRUE(minimum <= LV_OPA_60 + 8);
+    TEST_ASSERT_TRUE(maximum >= LV_OPA_COVER - 8);
+    TEST_ASSERT_TRUE(lv_anim_get(icon, NULL)->repeat_cnt == LV_ANIM_REPEAT_INFINITE);
 }
 
 void test_sound_mapping_and_availability(void) {
@@ -233,11 +355,38 @@ void test_alarm_snooze_keeps_saved_time(void) {
 
 void test_encoder_stops_alarm_without_disabling(void) {
     hg_app_test_hide_boot_overlay(true);
+    uint32_t refresh_period = _lv_disp_get_refr_timer(lv_disp_get_default())->period;
+    uint32_t animation_period = lv_anim_get_timer()->period;
     test_ring_alarm_now();
     hg_alarm_snapshot_t base;
     hg_alarm_get_snapshot(&base);
     hg_app_loop();
     TEST_ASSERT_TRUE(hg_overlays_alarm_visible());
+    check_ringing_overlay(base);
+    hg_alarm_snapshot_t preview = base;
+    for (uint8_t hour : {0, 11, 12, 23}) {
+        preview.hour = hour;
+        preview.minute = 59;
+        preview.snoozed = hour == 23;
+        hg_overlays_set_alarm(&preview);
+        check_ringing_overlay(preview);
+    }
+    hg_theme_set_nightlight(true);
+    hg_overlays_update();
+    check_ringing_overlay(preview);
+    hg_theme_set_nightlight(false);
+    hg_overlays_update();
+    check_ringing_overlay(preview);
+    preview.ringing = false;
+    preview.snoozed = false;
+    preview.enabled = false;
+    hg_overlays_set_alarm(&preview);
+    check_confirm_overlay("Alarm off", false);
+    TEST_ASSERT_EQUAL(refresh_period, _lv_disp_get_refr_timer(lv_disp_get_default())->period);
+    TEST_ASSERT_EQUAL(animation_period, lv_anim_get_timer()->period);
+    hg_overlays_set_alarm(&base);
+    check_ringing_overlay(base);
+    check_alarm_pulse(base);
 
     inject(true, false);
     hg_alarm_snapshot_t alarm;
@@ -245,6 +394,11 @@ void test_encoder_stops_alarm_without_disabling(void) {
     TEST_ASSERT_TRUE(alarm.snoozed);
     TEST_ASSERT_FALSE(alarm.ringing);
     TEST_ASSERT_TRUE(hg_overlays_alarm_visible());
+    check_confirm_overlay("Snoozed until", true);
+    TEST_ASSERT_EQUAL(refresh_period, _lv_disp_get_refr_timer(lv_disp_get_default())->period);
+    TEST_ASSERT_EQUAL(animation_period, lv_anim_get_timer()->period);
+    run_app_ms(100);
+    check_confirm_overlay("Snoozed until", true);
 
     inject(false, true);
     hg_alarm_get_snapshot(&alarm);
@@ -274,11 +428,19 @@ void test_encoder_stops_alarm_without_disabling(void) {
     /* Pressing while ringing stops it and leaves the alarm enabled. */
     test_ring_alarm_now();
     hg_app_loop();
+    hg_alarm_get_snapshot(&alarm);
+    check_ringing_overlay(alarm);
+    TEST_ASSERT_NOT_NULL(lv_anim_get(lv_obj_get_child(hg_overlays_test_alarm_root(), 0), NULL));
     inject(false, true);
     hg_alarm_get_snapshot(&alarm);
     TEST_ASSERT_FALSE(alarm.ringing);
     TEST_ASSERT_FALSE(alarm.snoozed);
     TEST_ASSERT_TRUE(alarm.enabled);
+    check_confirm_overlay("Next alarm", true);
+    TEST_ASSERT_EQUAL(refresh_period, _lv_disp_get_refr_timer(lv_disp_get_default())->period);
+    TEST_ASSERT_EQUAL(animation_period, lv_anim_get_timer()->period);
+    run_app_ms(100);
+    check_confirm_overlay("Next alarm", true);
     wait_overlay_gone();
     hg_alarm_set_enabled(false);
 }
