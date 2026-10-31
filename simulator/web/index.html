@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="icon" href="data:,">
+  <title>Hourglass LVGL preview</title>
+  <style>
+    body { margin: 24px; background: #17191d; color: #eee; font: 15px system-ui; }
+    main { display: flex; flex-wrap: wrap; gap: 24px; }
+    canvas { width: 640px; height: 480px; image-rendering: pixelated; background: black; }
+    button, select, input { font: inherit; padding: 6px; margin: 4px; }
+    button { cursor: pointer; }
+    fieldset { margin-bottom: 12px; max-width: 600px; }
+    label { display: inline-block; }
+    input[type=number] { width: 70px; }
+    #errors { color: #ffafaf; white-space: pre-wrap; }
+    pre { max-width: 600px; white-space: pre-wrap; }
+    .hint { color: #bcc5d0; max-width: 900px; }
+  </style>
+</head>
+<body>
+  <h1>Hourglass LVGL browser preview</h1>
+  <p class="hint">Actual LVGL 8.3.11 UI and alarm/input policy. Simulated peripherals and memory-only
+    settings. No speaker, LEDs, secrets or ESP32 timing validation. The canvas is not a touchscreen.</p>
+  <p id="status" role="status">Loading WebAssembly...</p>
+  <main>
+    <section>
+      <canvas id="display" width="320" height="240" aria-label="320 by 240 LVGL display"></canvas>
+      <p>
+        <label>Scale <select id="scale"><option>1</option><option selected>2</option><option>3</option></select></label>
+        <button id="capture">Download 320x240 PNG</button>
+      </p>
+      <div id="errors" role="alert"></div>
+    </section>
+    <section>
+      <fieldset><legend>Scenario (fresh instance)</legend>
+        <select id="scenario" aria-label="Preview scenario"></select>
+        <button id="load">Load scenario</button>
+      </fieldset>
+      <fieldset><legend>Physical inputs</legend>
+        <button id="encoder-down">Encoder down</button><button id="encoder-up">Encoder up</button>
+        <button id="press">Short press</button><button id="hold">Hold 1 second</button><br>
+        <button id="touch-down">Touch down</button><button id="touch-up">Touch up</button>
+        <button id="tap">Touch tap</button><br>
+        <button id="left">Encoder -1</button><button id="right">Encoder +1</button>
+      </fieldset>
+      <fieldset><legend>Virtual time</legend>
+        <button id="play">Play</button>
+        <label>Advance ms <input id="step" type="number" value="100" min="0" max="3600000"></label>
+        <button id="advance">Advance</button>
+        <p>Paused time gives reproducible animation captures. Holds need Play or explicit time advance.</p>
+      </fieldset>
+      <fieldset><legend>Simulated external inputs</legend>
+        <label>Hour <input id="hour" type="number" min="0" max="23" value="10"></label>
+        <label>Minute <input id="minute" type="number" min="0" max="59" value="8"></label>
+        <label><input id="valid-time" type="checkbox" checked>Valid time</label><br>
+        <label>Wi-Fi <select id="wifi"><option value="2">Connected</option><option value="1">Connecting</option><option value="0">Disconnected</option></select></label>
+        <label>Sample <select id="sample"><option value="1">Ready</option><option value="0">Waiting</option><option value="2">Stale</option><option value="3">Paused</option><option value="4">Unavailable</option><option value="5">Error (last good)</option></select></label><br>
+        <label>Lux <input id="lux" type="number" value="100" min="0" max="100000"></label>
+        <label>Outdoor C <input id="outdoor" type="number" value="18" min="-100" max="100"></label>
+        <label>Indoor C <input id="indoor" type="number" value="22" min="-100" max="100"></label>
+        <label>Humidity % <input id="humidity" type="number" value="45" min="0" max="100"></label>
+        <label>AQI <input id="aqi" type="number" value="32" min="0" max="500"></label>
+        <button id="apply">Apply external inputs</button>
+      </fieldset>
+      <details open><summary>Policy diagnostics (simulated, not hardware measurements)</summary><pre id="diagnostics"></pre></details>
+    </section>
+  </main>
+  <script src="hourglass.js"></script>
+  <script src="preview.js"></script>
+</body>
+</html>

@@ -2,6 +2,15 @@
 
 ESP32-S3 / Arduino-ESP32 / LVGL 8 firmware.
 
+## Browser UI preview
+
+The isolated [browser simulator](simulator/README.md) runs the production LVGL
+8.3.11 UI, fonts, app/input router and alarm/display/effects policy on Windows
+through WebAssembly. Agents can interact with physical-input-equivalent browser
+controls and take deterministic 320 x 240 screenshots without flashing the
+clock. Peripherals and storage are simulated; ESP32 hardware timing still
+requires the device tests. The production PlatformIO build is unchanged.
+
 ## Runtime ownership
 
 The Arduino loop is the **only LVGL and UI-policy owner**. It consumes copies of

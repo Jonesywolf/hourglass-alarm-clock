@@ -51,6 +51,41 @@ Keep a single `-Iinclude` in `platformio.ini`. Do not add nested `-Isrc/hal` fla
 
 Secrets stay in gitignored `include/secrets.h`. Copy `include/secrets.example.h`. UI must never include secrets.
 
+## Browser UI preview
+
+- For UI/layout/animation and input-policy changes, use the
+  [simulator runbook](simulator/README.md) to preview the actual LVGL 8.3.11
+  screens, fonts and production app/alarm/input policy before reporting success.
+  Keep the browser build isolated; do not copy/recreate screens in HTML or add
+  browser dependencies to the ESP32 PlatformIO environments.
+- From the repository root, build with
+  `.\simulator\build.ps1 -EmsdkPath <activated-sdk-path>` (Emscripten 4.0.10),
+  then run `node .\simulator\serve.cjs` and open `http://127.0.0.1:8080`.
+  The runbook covers explicit CMake/Ninja paths and process-local PowerShell
+  script policy. Reuse available tools; do not assume a prior session's SDK path.
+- Reuse a responding preview server if one is already running. Otherwise start
+  one on loopback and verify HTTP readiness. Rebuild and reload after source or
+  font changes; there is no hot reload. Stop validation-only servers afterward;
+  leave a persistent preview running only when requested.
+- Use browser tools to inspect the page and await `window.hgPreview.ready`.
+  LVGL widgets are canvas pixels, not DOM elements: interact through accessible
+  touch/encoder controls or `hgPreview`, then inspect screenshots and policy
+  diagnostics. The canvas is not a touchscreen; do not invent widget-click UX.
+- For reproducible captures, pause, await `hgPreview.scenario(name)`, advance a
+  specified virtual duration with `hgPreview.advance(ms)`, then capture. Each
+  scenario starts a fresh instance. Use `hgPreview.capture()` or the download
+  button for native 320 x 240 PNGs; do not substitute arbitrary wall-clock sleeps
+  or a screenshot of the scaled page for native-size capture.
+- Run the browser regression checks through a browser evaluate call:
+  `await window.hgPreview.ready; const { runSimulationTests } = await import("/test.js"); await runSimulationTests();`.
+  Also inspect the changed states visually (including night mode and relevant
+  animation phases); report assertions and visible/browser errors accurately.
+- Peripherals/time/network are synthetic, settings are memory-only, and audio/
+  LEDs are unavailable. Browser checks do not prove ESP32 frame/capture timing,
+  DMA, worker concurrency, NVS durability or physical input. Continue to build
+  production firmware and follow the device test runbook when applicable; a
+  preview never grants upload/audio permission or replaces hardware validation.
+
 ## Runtime and tests
 
 - Only the Arduino UI task calls LVGL or mutates navigation/alarm/effect policy.
