@@ -106,10 +106,12 @@ of the old beep. Do not raise quiet test caps as a substitute for this check.
   stop-without-disabling with the post-dismiss lockout, and the real audio worker
   (start, generation-matched ack, stop ack, underruns/errors, stack margin).
   The stop/snooze case also checks the simplified alarm overlay's exact glyph/text
-  inventory, arrow directions, theme colors, nonoverlapping in-bounds geometry
-  including midnight/noon/wide times, confirmation visibility, repeating pulse
-  opacity bounds, unchanged-snapshot continuity, animation cancellation, and
-  restoration of the temporary ringing refresh/animation cadence.
+  inventory, arrow directions, theme colors, in-bounds nonoverlapping geometry, including
+  midnight/noon/wide times, confirmation visibility, repeating pulse
+  opacity bounds synchronized across the emblem/arrows, hint translation (0-6 px,
+  snooze up and stop right, at most 2 px per frame, reset on confirmation), unchanged-snapshot
+  continuity, animation cancellation, and restoration of the temporary ringing
+  refresh/animation cadence.
   Cue cases verify five distinct finite waveforms, exact lengths, amplitude
   caps, smooth/decaying edges, inter-note silence and chunk independence; real
   worker cases verify complete DMA drain, replacement, alarm preemption and
@@ -164,10 +166,13 @@ of the old beep. Do not raise quiet test caps as a substitute for this check.
 ## Physical touch and cold-boot verification
 
 After an alarm-overlay design change, also observe normal firmware while ringing:
-one large alarm icon and time, "Tap to snooze" with an upward arrow toward the
+one centered alarm emblem and larger time with a small am/pm
+suffix, "Tap to snooze" with an upward arrow toward the
 top control, and "Press to stop" with a rightward arrow toward the encoder.
-Confirm the pulse is slow and subtle, never disappears, and leaves the hints/time
-static. Check both day/night themes, tap to snooze, and press to stop; confirmations
+Confirm the emblem and arrows pulse together, slowly and subtly, never disappear,
+each hint's text and arrow nudge toward their control (snooze up, stop right),
+and the time stays static. Check both day/night themes, tap to snooze,
+and press to stop; confirmations
 must have no action hints or pulsing. Automated LVGL assertions do not substitute
 for judging the physical display's appearance.
 

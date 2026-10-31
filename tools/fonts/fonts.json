@@ -56,10 +56,25 @@
       "icons": ["alarm"]
     },
     {
+      "_comment": "Ringing emblem; confirmations retain the existing 72px alarm glyph.",
+      "name": "icons_alarm_48",
+      "source": "material-icons-outlined",
+      "size": 48,
+      "icons": ["alarm"]
+    },
+    {
       "_comment": "Clock digits only: 0-9 and ':'.",
       "name": "inter_96",
       "source": "inter",
       "size": 96,
+      "variations": { "opsz": 32, "wght": 400 },
+      "ranges": ["48-58"]
+    },
+    {
+      "_comment": "Alarm overlay display digits; meridiem uses the existing status font.",
+      "name": "inter_48",
+      "source": "inter",
+      "size": 48,
       "variations": { "opsz": 32, "wght": 400 },
       "ranges": ["48-58"]
     },

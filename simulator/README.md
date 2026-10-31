@@ -138,6 +138,10 @@ await runSimulationTests();
 The test module asserts actual input/alarm transitions, hold/editor/volume
 boundaries, clamps, overlay/navigation gating, night/off/wake, all scenario
 rendering, RGB channel order, native viewport size and deterministic PNG output.
+Alarm checks also compare arrow pixels at the pulse peak/trough/full cycle,
+ensure the digits stay static, verify each instruction nudges toward its
+control (snooze up, stop right) in single-pixel steps, rests, and returns after a cycle, and verify confirmation glyphs
+render after snooze and stop.
 Failures throw with state diagnostics. The suite leaves a fresh clock preview.
 
 ## What this does not prove

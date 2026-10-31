@@ -104,19 +104,18 @@ static void check_ringing_overlay(const hg_alarm_snapshot_t &alarm) {
     }
     lv_obj_t *icon = lv_obj_get_child(root, 0);
     TEST_ASSERT_EQUAL_STRING(HG_ICON_ALARM, lv_label_get_text(icon));
-    TEST_ASSERT_TRUE(lv_obj_get_style_text_font(icon, 0) == HG_FONT_ALARM_ICON);
-    TEST_ASSERT_TRUE(lv_obj_has_flag(lv_obj_get_child(root, 1), LV_OBJ_FLAG_HIDDEN));
+    TEST_ASSERT_TRUE(lv_obj_get_style_text_font(icon, 0) == HG_FONT_ALARM_EMBLEM);
+    TEST_ASSERT_EQUAL_STRING(alarm.hour >= 12 ? "pm" : "am",
+                             lv_label_get_text(lv_obj_get_child(root, 1)));
     char expected[16];
     int hour12 = alarm.hour % 12;
-    snprintf(expected, sizeof(expected), "%d:%02d %s", hour12 ? hour12 : 12,
-             alarm.minute, alarm.hour >= 12 ? "pm" : "am");
+    snprintf(expected, sizeof(expected), "%d:%02d", hour12 ? hour12 : 12, alarm.minute);
     TEST_ASSERT_EQUAL_STRING(expected, lv_label_get_text(lv_obj_get_child(root, 2)));
     TEST_ASSERT_EQUAL_STRING("Tap to snooze", lv_label_get_text(lv_obj_get_child(root, 3)));
     TEST_ASSERT_EQUAL_STRING("Press to stop", lv_label_get_text(lv_obj_get_child(root, 5)));
+    TEST_ASSERT_TRUE(lv_obj_get_style_text_font(lv_obj_get_child(root, 2), 0) == HG_FONT_ALARM_TIME);
     for (uint32_t i = 0; i < 7; ++i) {
-        if (i != 1) {
-            TEST_ASSERT_FALSE(lv_obj_has_flag(lv_obj_get_child(root, i), LV_OBJ_FLAG_HIDDEN));
-        }
+        TEST_ASSERT_FALSE(lv_obj_has_flag(lv_obj_get_child(root, i), LV_OBJ_FLAG_HIDDEN));
     }
     for (uint32_t index : {4U, 6U}) {
         lv_obj_t *arrow = lv_obj_get_child(root, index);
@@ -132,10 +131,10 @@ static void check_ringing_overlay(const hg_alarm_snapshot_t &alarm) {
     }
     TEST_ASSERT_EQUAL_HEX32(lv_color_to32(hg_theme_alarm()),
                           lv_color_to32(lv_obj_get_style_text_color(icon, 0)));
-    TEST_ASSERT_EQUAL_HEX32(lv_color_to32(hg_theme_alarm()),
+    TEST_ASSERT_EQUAL_HEX32(lv_color_to32(hg_theme_fg()),
                           lv_color_to32(lv_obj_get_style_text_color(lv_obj_get_child(root, 2), 0)));
     for (uint32_t index : {3U, 5U}) {
-        TEST_ASSERT_EQUAL_HEX32(lv_color_to32(hg_theme_fg()),
+        TEST_ASSERT_EQUAL_HEX32(lv_color_to32(hg_theme_alarm()),
                               lv_color_to32(lv_obj_get_style_text_color(lv_obj_get_child(root, index), 0)));
     }
     check_overlay_geometry(root);
@@ -151,8 +150,18 @@ static void check_confirm_overlay(const char *title, bool enabled) {
         TEST_ASSERT_TRUE(lv_obj_has_flag(lv_obj_get_child(root, i), LV_OBJ_FLAG_HIDDEN));
     }
     lv_obj_t *icon = lv_obj_get_child(root, 0);
+    TEST_ASSERT_TRUE(lv_obj_get_style_text_font(icon, 0) == HG_FONT_ALARM_ICON);
+    if (enabled) {
+        TEST_ASSERT_TRUE(lv_obj_get_style_text_font(lv_obj_get_child(root, 2), 0) == HG_FONT_ALARM);
+    }
     TEST_ASSERT_NULL(lv_anim_get(icon, NULL));
     TEST_ASSERT_EQUAL(LV_OPA_COVER, lv_obj_get_style_text_opa(icon, 0));
+    TEST_ASSERT_EQUAL(LV_OPA_COVER, lv_obj_get_style_line_opa(lv_obj_get_child(root, 4), 0));
+    TEST_ASSERT_EQUAL(LV_OPA_COVER, lv_obj_get_style_line_opa(lv_obj_get_child(root, 6), 0));
+    for (uint32_t i = 3; i < 7; ++i) {
+        TEST_ASSERT_EQUAL(0, lv_obj_get_style_translate_x(lv_obj_get_child(root, i), 0));
+        TEST_ASSERT_EQUAL(0, lv_obj_get_style_translate_y(lv_obj_get_child(root, i), 0));
+    }
     check_overlay_geometry(root);
 }
 
@@ -164,11 +173,29 @@ static void check_alarm_pulse(const hg_alarm_snapshot_t &alarm) {
     TEST_ASSERT_EQUAL(16, lv_anim_get_timer()->period);
     int minimum = LV_OPA_COVER;
     int maximum = LV_OPA_TRANSP;
+    int min_offset = 99;
+    int max_offset = -1;
+    int previous_offset = -1;
     uint32_t started = millis();
     while (millis() - started < 2300U) {
         hg_app_loop();
         int opacity = lv_obj_get_style_text_opa(icon, 0);
         TEST_ASSERT_TRUE(opacity >= LV_OPA_60 && opacity <= LV_OPA_COVER);
+        TEST_ASSERT_EQUAL(opacity, lv_obj_get_style_line_opa(lv_obj_get_child(root, 4), 0));
+        TEST_ASSERT_EQUAL(opacity, lv_obj_get_style_line_opa(lv_obj_get_child(root, 6), 0));
+        int offset = -lv_obj_get_style_translate_y(lv_obj_get_child(root, 3), 0);
+        TEST_ASSERT_TRUE(offset >= 0 && offset <= 6);
+        TEST_ASSERT_EQUAL(-offset, lv_obj_get_style_translate_y(lv_obj_get_child(root, 4), 0));
+        TEST_ASSERT_EQUAL(offset, lv_obj_get_style_translate_x(lv_obj_get_child(root, 5), 0));
+        TEST_ASSERT_EQUAL(offset, lv_obj_get_style_translate_x(lv_obj_get_child(root, 6), 0));
+        TEST_ASSERT_EQUAL(0, lv_obj_get_style_translate_x(lv_obj_get_child(root, 3), 0));
+        TEST_ASSERT_EQUAL(0, lv_obj_get_style_translate_y(lv_obj_get_child(root, 5), 0));
+        if (previous_offset >= 0) {
+            TEST_ASSERT_TRUE_MESSAGE(abs(offset - previous_offset) <= 2, "hint nudge jumped");
+        }
+        previous_offset = offset;
+        if (offset < min_offset) min_offset = offset;
+        if (offset > max_offset) max_offset = offset;
         if (opacity < minimum) minimum = opacity;
         if (opacity > maximum) maximum = opacity;
         lv_anim_t *animation = lv_anim_get(icon, NULL);
@@ -181,6 +208,8 @@ static void check_alarm_pulse(const hg_alarm_snapshot_t &alarm) {
     }
     TEST_ASSERT_TRUE(minimum <= LV_OPA_60 + 8);
     TEST_ASSERT_TRUE(maximum >= LV_OPA_COVER - 8);
+    TEST_ASSERT_EQUAL(0, min_offset);
+    TEST_ASSERT_EQUAL(6, max_offset);
     TEST_ASSERT_TRUE(lv_anim_get(icon, NULL)->repeat_cnt == LV_ANIM_REPEAT_INFINITE);
 }
 

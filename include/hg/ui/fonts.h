@@ -10,16 +10,20 @@ LV_FONT_DECLARE(icons_72);
 LV_FONT_DECLARE(icons_14);
 LV_FONT_DECLARE(icons_36);
 LV_FONT_DECLARE(icons_alarm_72);
+LV_FONT_DECLARE(icons_alarm_48);
 LV_FONT_DECLARE(inter_96);
+LV_FONT_DECLARE(inter_48);
 LV_FONT_DECLARE(inter_28);
 LV_FONT_DECLARE(inter_14);
 
 #define HG_FONT_CLOCK   (&inter_96)
 #define HG_FONT_STATUS  (&inter_14)
 #define HG_FONT_ALARM   (&inter_28)
+#define HG_FONT_ALARM_TIME (&inter_48)
 #define HG_FONT_WIFI_ICON  (&icons_72)
 #define HG_FONT_WIFI_ICON_SMALL  (&icons_14)
 #define HG_FONT_ALARM_ICON  (&icons_alarm_72)
+#define HG_FONT_ALARM_EMBLEM (&icons_alarm_48)
 #define HG_FONT_ACTION_ICON  (&icons_36)
 #define HG_FONT_VOLUME_ICON  (&icons_14)
 #define HG_ICON_VOLUME_LOW   "\uE04D"

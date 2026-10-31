@@ -18,6 +18,11 @@ static lv_obj_t *touch_arrow;
 static lv_obj_t *knob_text;
 static lv_obj_t *knob_arrow;
 static int32_t alarm_icon_opacity = LV_OPA_COVER;
+static const int32_t hint_travel = 6;
+static const int32_t pulse_period = 2000;
+static const int32_t nudge_out_ms = 380;
+static const int32_t nudge_back_ms = 520;
+static int32_t hint_offset = 0;
 static uint32_t alarm_refresh_period = 0;
 static uint32_t alarm_animation_period = 0;
 static bool prev_snoozed = false;
@@ -31,21 +36,52 @@ static bool volume_colors_valid = false;
 static bool volume_icon_high = true;
 static lv_color_t volume_fg, volume_bg;
 static const int volume_width = 28;
-static const lv_point_t touch_arrow_points[] = {{14, 36}, {14, 2}, {4, 13}, {14, 2}, {24, 13}};
-static const lv_point_t knob_arrow_points[] = {{2, 13}, {36, 13}, {25, 3}, {36, 13}, {25, 23}};
+static const lv_point_t touch_arrow_points[] = {{7, 16}, {7, 2}, {2, 7}, {7, 2}, {12, 7}};
+static const lv_point_t knob_arrow_points[] = {{2, 7}, {16, 7}, {11, 2}, {16, 7}, {11, 12}};
 
-static void pulse_alarm_icon(void *object, int32_t opacity) {
-    const int32_t step = 8;
-    int32_t level = LV_OPA_TRANSP + ((opacity - LV_OPA_TRANSP + step / 2) / step) * step;
-    if (level > LV_OPA_COVER) {
-        level = LV_OPA_COVER;
-    } else if (level < LV_OPA_60) {
-        level = LV_OPA_60;
+// Nudges each hint toward its physical control: snooze up, stop right.
+static void set_hint_offset(int32_t offset) {
+    if (offset == hint_offset) {
+        return;
     }
+    hint_offset = offset;
+    lv_obj_set_style_translate_y(touch_text, -offset, 0);
+    lv_obj_set_style_translate_y(touch_arrow, -offset, 0);
+    lv_obj_set_style_translate_x(knob_text, offset, 0);
+    lv_obj_set_style_translate_x(knob_arrow, offset, 0);
+}
+
+// Eased progress (0..LV_BEZIER_VAL_MAX) through one segment of the pulse cycle.
+static int32_t eased(int32_t elapsed, int32_t duration, uint32_t u1, uint32_t u2) {
+    uint32_t t = static_cast<uint32_t>(elapsed) * LV_BEZIER_VAL_MAX / duration;
+    return static_cast<int32_t>(lv_bezier3(LV_MIN(t, static_cast<uint32_t>(LV_BEZIER_VAL_MAX)),
+                                           0, u1, u2, LV_BEZIER_VAL_MAX));
+}
+
+// One 2 s cycle: the emblem/arrows breathe down and back up, while the hints
+// make one quick nudge toward their controls and then rest. A short, brisk
+// nudge keeps whole-pixel motion to about one pixel per frame.
+static void pulse_alarm_icon(void *object, int32_t phase) {
+    const int32_t half = pulse_period / 2;
+    int32_t dim = phase < half ? eased(phase, half, 50, 952)
+                               : LV_BEZIER_VAL_MAX - eased(phase - half, half, 50, 952);
+    const int32_t step = 4;
+    int32_t level = LV_OPA_COVER - (LV_OPA_COVER - LV_OPA_60) * dim / LV_BEZIER_VAL_MAX;
+    level = LV_OPA_60 + ((level - LV_OPA_60 + step / 2) / step) * step;
+    level = LV_CLAMP(LV_OPA_60, level, LV_OPA_COVER);
     if (level != alarm_icon_opacity) {
         alarm_icon_opacity = level;
         lv_obj_set_style_text_opa(static_cast<lv_obj_t *>(object), level, 0);
+        lv_obj_set_style_line_opa(touch_arrow, level, 0);
+        lv_obj_set_style_line_opa(knob_arrow, level, 0);
     }
+    int32_t reach = 0;
+    if (phase < nudge_out_ms) {
+        reach = eased(phase, nudge_out_ms, 600, 1024);
+    } else if (phase < nudge_out_ms + nudge_back_ms) {
+        reach = LV_BEZIER_VAL_MAX - eased(phase - nudge_out_ms, nudge_back_ms, 50, 952);
+    }
+    set_hint_offset((hint_travel * reach + LV_BEZIER_VAL_MAX / 2) / LV_BEZIER_VAL_MAX);
 }
 
 static void start_alarm_pulse(void) {
@@ -58,15 +94,17 @@ static void start_alarm_pulse(void) {
     lv_timer_set_period(animations, 16);
     alarm_icon_opacity = LV_OPA_COVER;
     lv_obj_set_style_text_opa(icon_label, LV_OPA_COVER, 0);
+    lv_obj_set_style_line_opa(touch_arrow, LV_OPA_COVER, 0);
+    lv_obj_set_style_line_opa(knob_arrow, LV_OPA_COVER, 0);
+    set_hint_offset(0);
     lv_anim_t animation;
     lv_anim_init(&animation);
     lv_anim_set_var(&animation, icon_label);
     lv_anim_set_exec_cb(&animation, pulse_alarm_icon);
-    lv_anim_set_values(&animation, LV_OPA_COVER, LV_OPA_60);
-    lv_anim_set_time(&animation, 1000);
-    lv_anim_set_playback_time(&animation, 1000);
+    lv_anim_set_values(&animation, 0, pulse_period - 1);
+    lv_anim_set_time(&animation, pulse_period);
     lv_anim_set_repeat_count(&animation, LV_ANIM_REPEAT_INFINITE);
-    lv_anim_set_path_cb(&animation, lv_anim_path_ease_in_out);
+    lv_anim_set_path_cb(&animation, lv_anim_path_linear);
     lv_anim_start(&animation);
 }
 
@@ -74,6 +112,9 @@ static void stop_alarm_pulse(void) {
     if (icon_label) {
         lv_anim_del(icon_label, pulse_alarm_icon);
         lv_obj_set_style_text_opa(icon_label, LV_OPA_COVER, 0);
+        lv_obj_set_style_line_opa(touch_arrow, LV_OPA_COVER, 0);
+        lv_obj_set_style_line_opa(knob_arrow, LV_OPA_COVER, 0);
+        set_hint_offset(0);
         if (alarm_refresh_period) {
             lv_timer_set_period(_lv_disp_get_refr_timer(lv_obj_get_disp(icon_label)),
                                 alarm_refresh_period);
@@ -211,7 +252,7 @@ static lv_obj_t *make_arrow(const lv_point_t *points, uint16_t point_count,
     lv_obj_t *arrow = lv_line_create(root);
     lv_obj_remove_style_all(arrow);
     lv_line_set_points(arrow, points, point_count);
-    lv_obj_set_style_line_width(arrow, 3, 0);
+    lv_obj_set_style_line_width(arrow, 2, 0);
     lv_obj_set_style_line_rounded(arrow, true, 0);
     lv_obj_clear_flag(arrow, LV_OBJ_FLAG_CLICKABLE);
     lv_obj_align(arrow, align, x, y);
@@ -248,12 +289,12 @@ static void apply_colors(void) {
     have_last_colors = true;
     lv_obj_set_style_bg_color(root, bg, 0);
     lv_obj_set_style_text_color(icon_label, alarm, 0);
-    lv_obj_set_style_text_color(time_label, alarm, 0);
+    lv_obj_set_style_text_color(time_label, fg, 0);
     lv_obj_set_style_text_color(title_label, fg, 0);
     lv_obj_set_style_line_color(touch_arrow, hg_theme_muted(), 0);
-    lv_obj_set_style_text_color(touch_text, fg, 0);
+    lv_obj_set_style_text_color(touch_text, alarm, 0);
     lv_obj_set_style_line_color(knob_arrow, hg_theme_muted(), 0);
-    lv_obj_set_style_text_color(knob_text, fg, 0);
+    lv_obj_set_style_text_color(knob_text, alarm, 0);
 }
 
 static void create(void) {
@@ -278,17 +319,17 @@ static void create(void) {
 
     touch_text = make_label(HG_FONT_STATUS);
     lv_label_set_text(touch_text, "Tap to snooze");
-    lv_obj_align(touch_text, LV_ALIGN_TOP_MID, -24, 50);
+    lv_obj_align(touch_text, LV_ALIGN_TOP_MID, 0, 29);
     touch_arrow = make_arrow(touch_arrow_points,
                              sizeof(touch_arrow_points) / sizeof(touch_arrow_points[0]),
-                             LV_ALIGN_TOP_MID, -24, 8);
+                             LV_ALIGN_TOP_MID, 0, 6);
 
     knob_text = make_label(HG_FONT_STATUS);
     lv_label_set_text(knob_text, "Press to stop");
-    lv_obj_align(knob_text, LV_ALIGN_RIGHT_MID, -8, 34);
+    lv_obj_align(knob_text, LV_ALIGN_BOTTOM_MID, -12, -19);
     knob_arrow = make_arrow(knob_arrow_points,
                             sizeof(knob_arrow_points) / sizeof(knob_arrow_points[0]),
-                            LV_ALIGN_RIGHT_MID, -8, -3);
+                            LV_ALIGN_BOTTOM_MID, 46, -21);
     have_last_colors = false;
     apply_colors();
 }
@@ -298,11 +339,18 @@ static void set_time_text(const hg_alarm_snapshot_t *alarm) {
     if (hour12 == 0) {
         hour12 = 12;
     }
-    lv_label_set_text_fmt(time_label, "%d:%02d %s", hour12, alarm->minute,
-                          alarm->hour >= 12 ? "pm" : "am");
-    lv_obj_align(time_label, LV_ALIGN_TOP_MID,
-                 mode == OVERLAY_RINGING ? -24 : 0,
-                 mode == OVERLAY_RINGING ? 163 : 104);
+    if (mode == OVERLAY_RINGING) {
+        lv_obj_set_style_text_font(time_label, HG_FONT_ALARM_TIME, 0);
+        lv_label_set_text_fmt(time_label, "%d:%02d", hour12, alarm->minute);
+        lv_obj_align(time_label, LV_ALIGN_TOP_MID, -10, 144);
+        lv_label_set_text(title_label, alarm->hour >= 12 ? "pm" : "am");
+        lv_obj_align_to(title_label, time_label, LV_ALIGN_OUT_RIGHT_BOTTOM, 7, -8);
+    } else {
+        lv_obj_set_style_text_font(time_label, HG_FONT_ALARM, 0);
+        lv_label_set_text_fmt(time_label, "%d:%02d %s", hour12, alarm->minute,
+                             alarm->hour >= 12 ? "pm" : "am");
+        lv_obj_align(time_label, LV_ALIGN_TOP_MID, 0, 104);
+    }
 }
 
 static void show_ringing(const hg_alarm_snapshot_t *alarm) {
@@ -316,8 +364,9 @@ static void show_ringing(const hg_alarm_snapshot_t *alarm) {
         create();
     }
     mode = OVERLAY_RINGING;
-    lv_obj_add_flag(title_label, LV_OBJ_FLAG_HIDDEN);
-    lv_obj_align(icon_label, LV_ALIGN_TOP_MID, -24, 80);
+    lv_obj_clear_flag(title_label, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_set_style_text_font(icon_label, HG_FONT_ALARM_EMBLEM, 0);
+    lv_obj_align(icon_label, LV_ALIGN_TOP_MID, 0, 72);
     set_time_text(alarm);
     lv_obj_clear_flag(time_label, LV_OBJ_FLAG_HIDDEN);
     lv_obj_clear_flag(touch_text, LV_OBJ_FLAG_HIDDEN);
@@ -336,6 +385,7 @@ static void show_confirm(const hg_alarm_snapshot_t *alarm) {
         create();
     }
     mode = OVERLAY_CONFIRM;
+    lv_obj_set_style_text_font(icon_label, HG_FONT_ALARM_ICON, 0);
     lv_obj_align(icon_label, LV_ALIGN_TOP_MID, 0, 14);
     confirm_until_ms = lv_tick_get() + HG_ALARM_CONFIRM_MS;
     lv_label_set_text(title_label, alarm->snoozed ? "Snoozed until" :
@@ -364,6 +414,7 @@ void hg_overlays_init(void) {
     knob_text = knob_arrow = NULL;
     mode = OVERLAY_NONE;
     prev_snoozed = false;
+    hint_offset = 0;
 }
 
 void hg_overlays_set_alarm(const hg_alarm_snapshot_t *alarm) {
