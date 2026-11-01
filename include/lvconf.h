@@ -10,6 +10,13 @@
 #define LV_MEM_CUSTOM 0            // Use LVGL's internal memory manager
 #define LV_MEM_SIZE (64U * 1024U)   // 64 KB heap for UI widgets
 
+/* Hot blend/letter/mask routines run from IRAM: slides redraw every pixel, and the audio
+ * worker on the other core shares the flash cache, so cache misses stretched frames. */
+#if defined(ESP_PLATFORM)
+    #include "esp_attr.h"
+    #define LV_ATTRIBUTE_FAST_MEM IRAM_ATTR
+#endif
+
 /* Tick Customization */
 #define LV_TICK_CUSTOM 1
 #if LV_TICK_CUSTOM

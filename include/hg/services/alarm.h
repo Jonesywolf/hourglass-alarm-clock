@@ -17,6 +17,8 @@ void hg_alarm_dismiss(void);
 void hg_alarm_snooze(void);
 /* False briefly after dismiss/snooze so a repeated press cannot disable tomorrow's alarm. */
 bool hg_alarm_toggle_allowed(uint32_t now_ms);
+/* True once a ringing or snoozed alarm has been stopped (dismissed, not snoozed); sets the time. */
+bool hg_alarm_last_stopped(uint32_t *stopped_at_ms);
 
 #ifdef HG_RUNTIME_TEST
 void hg_alarm_test_check_time(const hg_time_snapshot_t *time);

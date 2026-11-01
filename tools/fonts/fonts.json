@@ -71,12 +71,20 @@
       "ranges": ["48-58"]
     },
     {
-      "_comment": "Alarm overlay display digits; meridiem uses the existing status font.",
+      "_comment": "Alarm overlay digits and the weather-page temperature: 0-9, ':', '-', degree sign, minus.",
       "name": "inter_48",
       "source": "inter",
       "size": 48,
       "variations": { "opsz": 32, "wght": 400 },
-      "ranges": ["48-58"]
+      "ranges": ["45", "48-58", "176"],
+      "text": "\u2212"
+    },
+    {
+      "_comment": "Weather-page chrome (tinted by the theme): location, wind, outdoor particles, indoor, precipitation, UV.",
+      "name": "icons_18",
+      "source": "material-icons-outlined",
+      "size": 18,
+      "icons": ["location_on", "air", "grain", "home", "water_drop", "wb_sunny"]
     },
     {
       "_comment": "Body/status text (HG_FONT_STATUS) and LVGL's default font. Printable ASCII, Latin-1 (includes the degree sign), plus typographic punctuation: en/em dash, curly quotes, bullet, ellipsis, minus.",

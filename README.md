@@ -22,7 +22,8 @@ does not give permission to call it from a screen or the UI loop.
 | Arduino loop | 1 / 1 | LVGL, navigation, alarm/display/effect policy, applying snapshots |
 | Input capture | 1 / 2 | Touch/button debounce and encoder capture, nominally every 5 ms |
 | Sensor worker | 0 / 1 | All shared `Wire` access, light and indoor-air acquisition |
-| Network worker | 0 / 1 | Wi-Fi maintenance, weather/phone service work, bounded diagnostic output |
+| Network worker | 0 / 1 | Wi-Fi maintenance, phone service work, bounded diagnostic output; merges the latest weather mailbox |
+| Weather worker | 0 / 0 | IP geolocation and Open-Meteo HTTPS fetches (seconds-long TLS calls), latest-value weather mailbox |
 | Persistence worker | 0 / 1 | Coalesced Preferences saves and acknowledgements |
 | Audio worker | 0 / 3 | I2S playback of the commanded sound; exists only if the speaker initialized |
 
@@ -93,11 +94,50 @@ HAL is still an unavailable stub. Feedback requests do not pretend an output is 
   support. No thermal-control guarantee is made by this policy.
 
 Sunrise scheduling, ramp duration, animation content, and actual
-LED/SEN66/weather integration are not implemented here. Future sunrise
+LED/SEN66 integration are not implemented here. Future sunrise
 progress should use elapsed monotonic time, not UI frame counts. Use hardware RMT
 for SK6812 output; do not bit-bang LEDs. Recheck shared internal-memory, peripheral,
 and CPU budgets, and merge any LED worker's applied state into the same
 `hg_effects_report_applied()` call the audio path uses.
+
+## Weather and air quality
+
+The weather worker (`src/app/weather_worker.cpp`) is the only caller of
+`services/location` and `services/weather`. It runs at priority 0 because TLS
+handshakes take seconds. It publishes a POD `hg_weather_snapshot_t` to a
+length-one mailbox. The network worker only peeks that mailbox, so a slow fetch
+cannot make the network snapshot stale.
+
+- **Location:** IP geolocation (ipapi.co) once per boot and then daily, cached in
+  NVS (`location_v1`) so the next boot can fetch weather before the lookup runs.
+  `WEATHER_LATITUDE` / `WEATHER_LONGITUDE` / `WEATHER_LOCATION_NAME` in `include/secrets.h`
+  override it (see `secrets.example.h`).
+- **Data:** Open-Meteo forecast every 15 min and air quality (US AQI) every 30 min.
+  No API key is needed. Both use pinned TLS roots (`src/services/http_roots.cpp`),
+  finite timeouts and exponential retry backoff. Data is `STALE` after 45 min. The
+  clock chip hides after 3 h without a successful fetch.
+- **Units:** snapshots are always metric. `hg_settings_t.units` (NVS
+  `settings_v1`, default `HG_DEFAULT_UNITS`) is loaded in app setup and only the UI
+  converts (`src/ui/weather_format.cpp`). There is no on-device toggle yet; the
+  planned settings page should call `hg_store_request_save_settings()` and update
+  the app's `settings`.
+- **Clock-face glance** (`services/glance`, pure and unit-testable): an icon and
+  temperature chip plus at most one context line, in this priority order:
+  1. storms now or expected today;
+  2. Poor indoor air (named cause);
+  3. outdoor AQI ≥ 101;
+  4. the day briefing (high/low plus rain timing or the day's condition) for
+     15 min after the alarm is **stopped**; snoozing does not trigger it;
+  5. gusts ≥ 50 km/h, heat ≥ 35 °C, cold ≤ −15 °C, UV ≥ 8.
+  Calm, normal days show no line.
+- **Indoor air:** there is no standard indoor AQI. `services/air_rating` rates
+  the SEN66 Good/Fair/Poor from the worst of CO2, PM2.5 and VOC index (thresholds in
+  `config.h`). The face only mentions indoor air when it is Poor; the weather page
+  always shows the level and indoor temperature, or `Indoor --` without a sensor.
+- **Weather page:** hero icon, temperature, condition, feels-like and high/low,
+  today's rain chance and UV, then a 5-column hourly strip over 24 hours. Encoder
+  rotation scrolls the strip; leaving the page resets it. The bottom chips show
+  wind (with gust range), color-coded outdoor AQI, and indoor air.
 
 ## Alarm and audio
 
@@ -338,6 +378,36 @@ Node.js is required for `lv_font_conv`; `fonttools` is installed into the cache 
 variable-font instances. After adding a font, declare it in `include/hg/ui/fonts.h`.
 The existing Wi-Fi icon fonts were first generated from Google's TTF; the official
 repository only ships OTF, so regenerating them can change anti-aliasing slightly.
+
+## Weather icons
+
+Full-color weather images under `src/ui/assets/icons/` come from
+[Meteocons](https://github.com/basmilius/weather-icons) (MIT, "fill" style). They
+are pinned by commit and SHA-256 in [`tools/icons/icons.json`](tools/icons/icons.json).
+`tools/icons/generate_icons.py` crops each SVG and freezes its animation at a
+representative pose. It rasterizes with resvg (npm, installed into the gitignored
+`.icons-cache/`) at 40 px and 80 px and writes two variants per size:
+
+- `hg_icon_<name>_<size>`: opaque RGB565 (`LV_IMG_CF_TRUE_COLOR`, requires
+  `LV_COLOR_16_SWAP`) for normal mode. Alpha is pre-blended onto the manifest
+  `background` (the theme's black), so icons must only be drawn over that color.
+  Opaque images avoid per-pixel alpha blending, which measurably slowed weather-page
+  frames while alarm audio ran. Muted (stale) icons still use `img_opa`.
+- `hg_icon_<name>_<size>_mono`: 8-bit alpha shaded by luminance, recolored with
+  the theme so nightlight mode stays red-only.
+
+All icons together cost about 360 KB of flash. Only `src/ui/weather_icons.cpp`
+maps conditions to images. `include/lvconf.h` also places LVGL's hot draw
+routines in IRAM (`LV_ATTRIBUTE_FAST_MEM`), costing about 13 KB of internal heap,
+so that rendering does not stall on flash-cache misses during core-0 audio.
+
+```powershell
+& $pio run -t icons          # regenerate (add an entry to icons.json first for new icons)
+& $pio run -t icons-force    # re-download sources and reinstall resvg
+& "$env:USERPROFILE\.platformio\penv\Scripts\python.exe" tools\icons\generate_icons.py --preview
+```
+
+`--preview` also writes PNGs to `.icons-cache/preview/` for review.
 
 ## Build and tests
 

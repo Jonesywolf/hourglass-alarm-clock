@@ -73,7 +73,8 @@ void test_brightness_keeps_last_good_classification(void) {
 
 void test_worker_creation_failure_cleanup(void) {
     hg_store_init();
-    for (int i = 0; i < 4; ++i) {
+    const int failing[] = {0, 1, 2, 3, 5};
+    for (int i : failing) {
         hg_runtime_test_fail_worker(i);
         TEST_ASSERT_FALSE(hg_runtime_start());
         TEST_ASSERT_NOT_NULL(hg_runtime_fault());
@@ -102,6 +103,7 @@ void test_app_startup(void) {
     if (hg_runtime_audio_running()) {
         TEST_ASSERT_GREATER_THAN_UINT32(256, diagnostics.stack_free_bytes[3]);
     }
+    TEST_ASSERT_GREATER_THAN_UINT32(256, diagnostics.stack_free_bytes[4]);
     hg_runtime_test_manual_input(true);
 }
 

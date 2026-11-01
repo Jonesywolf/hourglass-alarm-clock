@@ -18,22 +18,27 @@ FetchContent_MakeAvailable(lvgl)
 get_filename_component(ROOT "${CMAKE_CURRENT_SOURCE_DIR}/.." ABSOLUTE)
 file(GLOB_RECURSE LVGL_SOURCES CONFIGURE_DEPENDS "${lvgl_SOURCE_DIR}/src/*.c")
 file(GLOB FONT_SOURCES CONFIGURE_DEPENDS "${ROOT}/src/ui/assets/fonts/*.c")
+file(GLOB ICON_SOURCES CONFIGURE_DEPENDS "${ROOT}/src/ui/assets/icons/*.c")
 
 add_executable(hourglass
-    ${LVGL_SOURCES} ${FONT_SOURCES}
+    ${LVGL_SOURCES} ${FONT_SOURCES} ${ICON_SOURCES}
     "${ROOT}/src/diagnostics.cpp"
     "${ROOT}/src/app/app.cpp"
     "${ROOT}/src/app/input_router.cpp"
+    "${ROOT}/src/services/air_rating.cpp"
     "${ROOT}/src/services/alarm.cpp"
     "${ROOT}/src/services/brightness.cpp"
     "${ROOT}/src/services/display_mode.cpp"
     "${ROOT}/src/services/effects.cpp"
+    "${ROOT}/src/services/glance.cpp"
     "${ROOT}/src/services/sound.cpp"
     "${ROOT}/src/services/sound_alarm_clip.cpp"
     "${ROOT}/src/ui/theme.cpp"
     "${ROOT}/src/ui/navigator.cpp"
     "${ROOT}/src/ui/boot_overlay.cpp"
     "${ROOT}/src/ui/overlays.cpp"
+    "${ROOT}/src/ui/weather_format.cpp"
+    "${ROOT}/src/ui/weather_icons.cpp"
     "${ROOT}/src/ui/screens/clock_screen.cpp"
     "${ROOT}/src/ui/screens/weather_screen.cpp"
     main.cpp display.cpp runtime.cpp environment.cpp

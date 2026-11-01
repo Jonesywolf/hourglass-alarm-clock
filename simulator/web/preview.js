@@ -96,24 +96,50 @@ function setTime(hour, minute, second = 0, valid = true) {
     document.getElementById("minute").value = minute;
     document.getElementById("valid-time").checked = valid;
 }
+// [min, max, integer, label]; ids match the form controls. airStatus defaults to status.
+const environmentSpec = {
+    wifi: [0, 2, true, "Wi-Fi state"], lux: [0, 100000, false, "Lux"],
+    status: [0, 5, true, "Weather status"], sky: [0, 12, true, "Condition"],
+    outdoor: [-60, 60, false, "Outdoor temperature"], feels: [-60, 60, false, "Feels like"],
+    high: [-60, 60, false, "High"], low: [-60, 60, false, "Low"],
+    wind: [0, 250, false, "Wind"], gust: [0, 300, false, "Gust"], uv: [0, 15, false, "UV index"],
+    rain: [0, 100, true, "Rain chance"], aqi: [0, 500, true, "Outdoor AQI"],
+    airStatus: [0, 5, true, "Air status"], indoorStatus: [0, 5, true, "Indoor status"],
+    indoor: [-40, 80, false, "Indoor temperature"], humidity: [0, 100, false, "Humidity"],
+    co2: [0, 40000, true, "CO2"], pm25: [0, 1000, false, "PM2.5"], voc: [0, 500, true, "VOC index"],
+    units: [0, 1, true, "Units"],
+};
+const environmentDefaults = {
+    wifi: 2, lux: 100, status: 1, sky: 2, outdoor: 18, feels: 17, high: 22, low: 11, wind: 12,
+    gust: 20, uv: 5, rain: 10, aqi: 32, indoorStatus: 1, indoor: 22, humidity: 45, co2: 650,
+    pm25: 4, voc: 90, units: 0,
+};
+let started = false;
+let environment = { ...environmentDefaults };
 function setEnvironment(options = {}) {
     object(options, "Environment");
-    const values = { wifi: 2, status: 1, lux: 100, outdoor: 18, indoor: 22, humidity: 45, aqi: 32, ...options };
-    number(values.wifi, 0, 2, "Wi-Fi state");
-    number(values.status, 0, 5, "Sample status");
-    number(values.lux, 0, 100000, "Lux", false);
-    number(values.outdoor, -100, 100, "Outdoor temperature", false);
-    number(values.indoor, -100, 100, "Indoor temperature", false);
-    number(values.humidity, 0, 100, "Humidity", false);
-    number(values.aqi, 0, 500, "AQI");
-    call("sim_environment", null, Array(7).fill("number"),
-        [values.wifi, values.status, values.lux, values.outdoor, values.indoor, values.humidity, values.aqi]);
-    for (const key of ["wifi", "lux", "outdoor", "indoor", "humidity", "aqi"]) {
+    for (const key of Object.keys(options)) {
+        if (!Object.hasOwn(environmentSpec, key)) throw new Error(`Unknown environment key: ${key}`);
+    }
+    const values = { ...environmentDefaults, airStatus: options.status ?? environmentDefaults.status, ...options };
+    for (const [key, [min, max, integer, label]] of Object.entries(environmentSpec)) {
+        number(values[key], min, max, label, integer);
+    }
+    if (started && values.units !== environment.units) {
+        throw new Error("Units are read at boot; pass them to reset({ environment })");
+    }
+    environment = values;
+    call("sim_environment", null, ["number", "number"], [values.wifi, values.lux]);
+    call("sim_weather", null, Array(12).fill("number"), [values.status, values.sky, values.outdoor,
+        values.feels, values.high, values.low, values.wind, values.gust, values.uv, values.rain,
+        values.aqi, values.airStatus]);
+    call("sim_indoor", null, Array(6).fill("number"), [values.indoorStatus, values.indoor,
+        values.humidity, values.co2, values.pm25, values.voc]);
+    if (!started) call("sim_units", null, ["number"], [values.units]);
+    for (const key of Object.keys(environmentSpec)) {
         document.getElementById(key).value = values[key];
     }
-    document.getElementById("sample").value = values.status;
-}
-function cancelInputs() {
+}function cancelInputs() {
     call("sim_cancel_inputs", null);
     return advance(5);
 }
@@ -149,24 +175,51 @@ async function reset(options = {}) {
             printErr: showError,
             onAbort: (reason) => showError(`WebAssembly aborted: ${reason}`),
         });
-        setEnvironment(config.environment);
+        started = false;
         setTime(config.time?.hour ?? 10, config.time?.minute ?? 8,
             config.time?.second ?? 0, config.time?.valid ?? true);
+        setEnvironment(config.environment);
         if (config.fault) call("sim_fault", null, ["number"], [1]);
         call("sim_start", null, Array(5).fill("number"),
             [+config.enabled, config.hour, config.minute, config.volume, config.sound]);
+        started = true;
         return advance(0);
     } finally {
         loading = false;
     }
 }
+const toWeather = () => { press(40, "touch"); advance(320); };
+const weatherAt = (environment, time) => async () => { await reset({ environment, time }); toWeather(); };
 const scenarios = {
     colors: async () => { await reset(); call("sim_colors", null); },
     clock: async () => { await reset(); },
     disabled: async () => { await reset({ enabled: false }); },
-    weather: async () => { await reset(); press(40, "touch"); advance(320); },
-    unavailable: async () => { await reset({ environment: { status: 4 } }); press(40, "touch"); advance(320); },
-    stale: async () => { await reset({ environment: { status: 2 } }); press(40, "touch"); advance(320); },
+    weather: weatherAt({}),
+    weatherNight: weatherAt({ sky: 1, outdoor: 9, feels: 7, high: 15, low: 4 }, { hour: 22, minute: 30 }),
+    weatherRain: weatherAt({ sky: 6, rain: 85, outdoor: 12, feels: 10, high: 14, low: 9, wind: 24, gust: 46 }),
+    weatherScroll: async () => { await weatherAt({ rain: 70 })(); input("rotate", 3); advance(50); },
+    weatherImperial: weatherAt({ units: 1, sky: 1, outdoor: 31, feels: 34, high: 33, low: 20, uv: 9 }),
+    weatherNightlight: weatherAt({ lux: 1, sky: 6, rain: 80 }, { hour: 23, minute: 15 }),
+    weatherNoSensor: weatherAt({ indoorStatus: 4 }),
+    fetching: weatherAt({ status: 0, airStatus: 0 }),
+    unavailable: weatherAt({ status: 4 }),
+    stale: weatherAt({ status: 2 }),
+    glanceStorm: async () => { await reset({ environment: { sky: 11, rain: 90 } }); },
+    glanceSmoke: async () => { await reset({ environment: { sky: 3, aqi: 172 } }); },
+    glanceStuffy: async () => { await reset({ environment: { co2: 1720 } }); },
+    glanceGusts: async () => { await reset({ environment: { sky: 3, wind: 38, gust: 72 } }); },
+    glanceHeat: async () => { await reset({ environment: { sky: 1, outdoor: 34, high: 38, units: 1 } }); },
+    glanceNight: async () => { await reset({ environment: { lux: 1, sky: 1, outdoor: -3 } }); },
+    briefing: async () => {
+        await reset({ time: { hour: 7, minute: 0 }, environment: { rain: 70, high: 19, low: 8 } });
+        press();
+        advance(3000);
+    },
+    briefingOver: async () => {
+        await reset({ time: { hour: 7, minute: 0 }, environment: { rain: 70, high: 19, low: 8 } });
+        press();
+        advance(15 * 60000 + 1000);
+    },
     boot: async () => { await reset({ environment: { wifi: 0 } }); },
     syncing: async () => { await reset({ time: { valid: false } }); },
     fault: async () => { await reset({ fault: true }); },
@@ -228,11 +281,17 @@ handle("left", () => { input("rotate", -1); advance(5); });
 handle("right", () => { input("rotate", 1); advance(5); });
 handle("play", () => { setPlaying(!playing); update(); });
 handle("advance", () => advance(Number(document.getElementById("step").value)));
-handle("apply", () => {
+handle("apply", async () => {
     const value = (id) => Number(document.getElementById(id).value);
-    setTime(value("hour"), value("minute"), 0, document.getElementById("valid-time").checked);
-    setEnvironment({ wifi: value("wifi"), status: value("sample"), lux: value("lux"),
-        outdoor: value("outdoor"), indoor: value("indoor"), humidity: value("humidity"), aqi: value("aqi") });
+    const values = Object.fromEntries(Object.keys(environmentSpec).map((key) => [key, value(key)]));
+    const time = { hour: value("hour"), minute: value("minute"),
+        valid: document.getElementById("valid-time").checked };
+    if (values.units !== environment.units) {
+        await reset({ environment: values, time });
+        return;
+    }
+    setTime(time.hour, time.minute, 0, time.valid);
+    setEnvironment(values);
     advance(1000);
 });
 handle("capture", () => {

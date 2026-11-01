@@ -76,6 +76,36 @@
 
 #define HG_PAGE_SLIDE_MS 300U
 #define HG_WEATHER_IDLE_RETURN_MS (5U * 60U * 1000U)
+#define HG_WEATHER_HOURLY_VISIBLE 5
+
+/* Weather fetching (weather worker). Snapshots are metric; the UI converts per unit system. */
+#define HG_DEFAULT_UNITS HG_UNITS_METRIC
+#define HG_WEATHER_REFRESH_MS (15UL * 60UL * 1000UL)
+#define HG_AIR_REFRESH_MS (30UL * 60UL * 1000UL)
+#define HG_LOCATION_REFRESH_MS (24UL * 60UL * 60UL * 1000UL)
+#define HG_WEATHER_RETRY_MIN_MS 30000UL
+#define HG_WEATHER_RETRY_MAX_MS (10UL * 60UL * 1000UL)
+#define HG_WEATHER_HTTP_TIMEOUT_MS 8000U
+#define HG_WEATHER_STALE_MS (45UL * 60UL * 1000UL)
+/* Beyond this the clock-face chip is hidden instead of shown muted. */
+#define HG_WEATHER_EXPIRED_MS (3UL * 60UL * 60UL * 1000UL)
+#define HG_WEATHER_RAIN_PROB_PCT 50
+
+/* Clock-face glance: briefing window after the alarm is stopped, and outlier thresholds. */
+#define HG_GLANCE_BRIEFING_MS (15UL * 60UL * 1000UL)
+#define HG_GLANCE_GUST_KPH 50.0f
+#define HG_GLANCE_OUTDOOR_AQI 101
+#define HG_GLANCE_UV_INDEX 8.0f
+#define HG_GLANCE_HEAT_C 35.0f
+#define HG_GLANCE_COLD_C (-15.0f)
+
+/* Indoor air rating: Fair at/above the first value, Poor at/above the second. */
+#define HG_INDOOR_CO2_FAIR_PPM 1000
+#define HG_INDOOR_CO2_POOR_PPM 1500
+#define HG_INDOOR_PM25_FAIR 12.1f
+#define HG_INDOOR_PM25_POOR 35.5f
+#define HG_INDOOR_VOC_FAIR 150
+#define HG_INDOOR_VOC_POOR 250
 
 /* Lux hysteresis band: <= DARK enters low-light, >= BRIGHT returns to normal, in between holds. */
 #define HG_DISPLAY_DARK_LUX 5.0f

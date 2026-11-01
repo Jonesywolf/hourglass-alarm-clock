@@ -3,6 +3,8 @@
 
 #include "hg/types.h"
 
+/* Open-Meteo forecast + air quality for hg_location_get(). Blocking HTTPS:
+ * only the weather worker calls these. Values are always metric. */
 void hg_weather_init(void);
 void hg_weather_update(void);
 void hg_weather_get_snapshot(hg_weather_snapshot_t *out);

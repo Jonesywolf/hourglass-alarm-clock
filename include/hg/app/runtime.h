@@ -50,8 +50,8 @@ typedef struct {
     uint32_t expired_inputs;
     uint32_t sensor_max_us;
     uint32_t network_max_us;
-    /* input, sensor, network, audio (audio is 0 when no speaker) */
-    uint32_t stack_free_bytes[4];
+    /* input, sensor, network, audio (0 when no speaker), weather */
+    uint32_t stack_free_bytes[5];
     uint32_t input_queue_high_water;
     /* Cumulative since boot; reset_diagnostics keeps them. */
     uint32_t audio_underruns;

@@ -1,8 +1,12 @@
 #include "hg/ui/clock_screen.h"
 
+#include <string.h>
+
 #include "hg/config.h"
 #include "hg/ui/fonts.h"
 #include "hg/ui/theme.h"
+#include "hg/ui/weather_format.h"
+#include "hg/ui/weather_icons.h"
 
 static lv_obj_t *clock_label;
 static lv_obj_t *meridiem_label;
@@ -10,6 +14,9 @@ static lv_obj_t *wifi_label;
 static lv_obj_t *alarm_label;
 static lv_obj_t *sound_label;
 static lv_obj_t *sound_icon;
+static lv_obj_t *glance_icon;
+static lv_obj_t *glance_temp;
+static lv_obj_t *glance_line;
 static lv_timer_t *alarm_blink_timer;
 static hg_alarm_snapshot_t shown_alarm;
 static hg_alarm_edit_snapshot_t shown_edit;
@@ -76,6 +83,61 @@ static void render_alarm(void) {
     lv_label_set_text_fmt(alarm_label, "%s:%s%s", hours, minutes, hour >= 12 ? "pm" : "am");
 }
 
+/* Google "At a Glance"-style chip in the free top-left corner plus one context line. */
+static bool glance_rendered;
+static bool glance_shown_active;
+static bool glance_shown_nightlight;
+static hg_unit_system_t glance_shown_units;
+static hg_glance_snapshot_t glance_shown;
+
+static void render_glance(const hg_glance_snapshot_t *glance, hg_unit_system_t units,
+                          bool active) {
+    if (!glance_icon) {
+        return;
+    }
+    /* The 1 Hz UI tick must not restyle/re-layout an unchanged chip mid-animation. */
+    bool nightlight = hg_theme_nightlight();
+    if (glance_rendered && active == glance_shown_active &&
+        nightlight == glance_shown_nightlight && units == glance_shown_units &&
+        memcmp(glance, &glance_shown, sizeof(glance_shown)) == 0) {
+        return;
+    }
+    glance_rendered = true;
+    glance_shown_active = active;
+    glance_shown_nightlight = nightlight;
+    glance_shown_units = units;
+    memcpy(&glance_shown, glance, sizeof(glance_shown));
+    if (!active || !glance->show_weather) {
+        lv_obj_add_flag(glance_icon, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_add_flag(glance_temp, LV_OBJ_FLAG_HIDDEN);
+    } else {
+        hg_wx_icon_apply(glance_icon, glance->condition, glance->is_day, HG_WX_ICON_SMALL,
+                         glance->muted);
+        char temp[16];
+        hg_wx_format_temp(temp, sizeof(temp), glance->temp_c, units);
+        lv_label_set_text(glance_temp, temp);
+        lv_obj_set_style_text_color(glance_temp,
+                                    glance->muted ? hg_theme_muted() : hg_theme_fg(), 0);
+        lv_obj_clear_flag(glance_icon, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_clear_flag(glance_temp, LV_OBJ_FLAG_HIDDEN);
+    }
+    char line[64];
+    hg_wx_format_glance_line(line, sizeof(line), glance, units);
+    if (!active || !line[0]) {
+        lv_obj_add_flag(glance_line, LV_OBJ_FLAG_HIDDEN);
+        return;
+    }
+    lv_color_t color = glance->line == HG_GLANCE_LINE_OUTDOOR_AQI ?
+                       hg_wx_aqi_color(glance->aqi_category) :
+                       glance->line == HG_GLANCE_LINE_INDOOR_POOR ?
+                       hg_wx_air_level_color(HG_AIR_POOR) : hg_theme_alarm();
+    lv_label_set_text(glance_line, line);
+    lv_obj_set_style_text_color(glance_line, color, 0);
+    /* Without the chip (no weather) the line moves up into its place. */
+    lv_obj_set_pos(glance_line, 10, glance->show_weather ? 46 : 14);
+    lv_obj_clear_flag(glance_line, LV_OBJ_FLAG_HIDDEN);
+}
+
 static void blink_alarm(lv_timer_t *) {
     blink_visible = !blink_visible;
     render_alarm();
@@ -136,6 +198,23 @@ void hg_clock_screen_create(lv_obj_t *parent) {
     pending_wifi_samples = 0;
     hg_clock_set_wifi_icon(HG_WIFI_BARS_NONE, true);
     lv_obj_align(wifi_label, LV_ALIGN_TOP_RIGHT, -10, 14);
+
+    glance_rendered = false;
+    glance_icon = lv_img_create(parent);
+    lv_obj_set_pos(glance_icon, 6, 4);
+    lv_obj_add_flag(glance_icon, LV_OBJ_FLAG_HIDDEN);
+    glance_temp = lv_label_create(parent);
+    lv_obj_set_style_text_font(glance_temp, HG_FONT_ALARM, 0);
+    lv_label_set_text(glance_temp, "");
+    lv_obj_set_pos(glance_temp, 50, 8);
+    lv_obj_add_flag(glance_temp, LV_OBJ_FLAG_HIDDEN);
+    glance_line = lv_label_create(parent);
+    lv_obj_set_style_text_font(glance_line, HG_FONT_STATUS, 0);
+    lv_label_set_long_mode(glance_line, LV_LABEL_LONG_DOT);
+    lv_obj_set_width(glance_line, 250);
+    lv_label_set_text(glance_line, "");
+    lv_obj_set_pos(glance_line, 10, 46);
+    lv_obj_add_flag(glance_line, LV_OBJ_FLAG_HIDDEN);
 
     clock_label = lv_label_create(parent);
     lv_obj_set_style_text_font(clock_label, HG_FONT_CLOCK, 0);
@@ -213,9 +292,11 @@ void hg_clock_screen_update(const hg_clock_snapshot_t *snap) {
         lv_obj_add_flag(alarm_label, LV_OBJ_FLAG_HIDDEN);
         lv_obj_add_flag(sound_label, LV_OBJ_FLAG_HIDDEN);
         lv_obj_add_flag(sound_icon, LV_OBJ_FLAG_HIDDEN);
+        render_glance(&snap->glance, snap->units, false);
         return;
     }
 
+    render_glance(&snap->glance, snap->units, true);
     lv_obj_clear_flag(clock_label, LV_OBJ_FLAG_HIDDEN);
     lv_obj_clear_flag(meridiem_label, LV_OBJ_FLAG_HIDDEN);
     lv_obj_clear_flag(wifi_label, LV_OBJ_FLAG_HIDDEN);

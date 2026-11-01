@@ -97,7 +97,8 @@ of the old beep. Do not raise quiet test caps as a substitute for this check.
   acknowledgement, opt-in AQI policy, timing histogram behavior, and semantic
   cue replacement inside the ordinary rate limit without detent cancellation.
 - `runtime_tests.cpp`: nonwaiting invalid time/RTC fallback, last-good brightness,
-  worker-creation failure cleanup, startup/stack margins, queue saturation and
+  worker-creation failure cleanup (including the weather worker), startup/stack
+  margins (`stack_free_bytes[4]` is the weather worker), queue saturation and
   expiry, navigation generations, stale/paused snapshots, save coalescing and
   older acknowledgements, save failure/retry/admission, navigation/encoder
   behavior, and alarm processing/dismissal during slides/the overlay.
@@ -223,7 +224,11 @@ The current suite contains 47 cases.
    The callback never calls LVGL; acknowledgement remains on the UI task.
 5. **STACK** values are free bytes, not words, in this ESP-IDF build. Each worker
    must retain more than 256 bytes in startup tests; retain comfortable measured
-   headroom when adding TLS, drivers, decoding, or larger locals.
+   headroom when adding TLS, drivers, decoding, or larger locals. The weather
+   worker's 12 KB stack covers mbedTLS plus ArduinoJson filtering; after real
+   HTTPS location/forecast/air fetches it retained 5,140-6,444 bytes free. The
+   worker prints `Weather: ... stack free` on each status change; re-measure on
+   device after a real fetch, which startup tests without Wi-Fi do not exercise.
 6. **NVS** must report four real scratch saves, nonzero write timing, successful
    probe removal, capture <=10,000 us, and frame maximum <=50,000 us.
    This measures the current NVS layout; it does not prove every future garbage
@@ -305,6 +310,32 @@ After the automated suite restores normal firmware:
   adjustments must be recorded separately from automated passes.
 
 ## Reference measurements
+
+The weather glance/page implementation passed all 50 cases on the ESP32-S3 clock
+on COM4 in two consecutive final runs (test exit 0; production restoration exit
+0 both times), with live Wi-Fi weather fetched during the runs (weather worker
+5,204-6,420 bytes stack free). Final-run slide baseline/loaded maxima were
+34.203 / 34.295 ms (p95 35 ms); alarm-ringing (AUDIO LOAD) maxima were
+47.625 / 47.310 / 45.650 ms with p95 44 ms and UI work up to 36.5 ms; cue load
+p95 37 ms, maximum 39.463 ms; volume load maximum 42.401 ms; four scratch saves
+(longest 21.408 ms). Captures stayed at or below 5.501 ms, with zero
+underruns/write errors. Heap during playback: internal free 96,928 bytes,
+minimum 29,788 bytes (about 13 KB less than before, from LVGL draw code in IRAM).
+For comparison, unmodified `ef9df84` measured AUDIO LOAD p95 43 ms / max 43.4 ms,
+cue max 32.6 ms and volume max 46.3 ms on the same board.
+
+Retained failure evidence: the first weather run failed AUDIO LOAD (50.087 ms)
+and VOLUME LOAD (54.450 ms). Ringing frames run concurrently with core-0 audio,
+which amplified render cost for the weather page that was being slid in. Three
+changes, kept together, restored margin without changing thresholds or load:
+(1) the clock glance and weather page skip LVGL setters when their inputs are
+unchanged on the 1 Hz tick (volume max fell to 45.9 ms); (2) full-color icons are
+pre-blended to opaque RGB565 (AUDIO LOAD max about 49.1-49.7 ms); (3)
+`LV_ATTRIBUTE_FAST_MEM` places LVGL draw routines in IRAM (UI work 40 -> 36 ms,
+maximum 47.1-47.6 ms). A diagnostic build that hid weather icons attributed
+about 3 ms to icons and 4-5 ms to page text; it was not retained. One
+intermediate run also repeated the known scratch-NVS stall (a 126 ms write with
+a 34 ms capture gap); the following runs passed it unchanged.
 
 The three-choice alarm and sound-name music icon passed all 50 cases on the
 ESP32-S3 clock on COM4 (test exit 0; production restoration exit 0), including

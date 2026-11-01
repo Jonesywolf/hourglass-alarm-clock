@@ -11,6 +11,7 @@ LV_FONT_DECLARE(icons_14);
 LV_FONT_DECLARE(icons_36);
 LV_FONT_DECLARE(icons_alarm_72);
 LV_FONT_DECLARE(icons_alarm_48);
+LV_FONT_DECLARE(icons_18);
 LV_FONT_DECLARE(inter_96);
 LV_FONT_DECLARE(inter_48);
 LV_FONT_DECLARE(inter_28);
@@ -35,5 +36,16 @@ LV_FONT_DECLARE(inter_14);
 #define HG_ICON_ALARM      "\uE855"
 #define HG_ICON_SNOOZE     "\uE046"
 #define HG_ICON_ALARM_OFF  "\uE857"
+
+/* Weather page: big temperature (inter_48 has digits, '-', degree, minus) and chrome glyphs in
+ * icons_18 (Material Icons Outlined). Condition art is full color, see hg/ui/icons.h. */
+#define HG_FONT_WEATHER_TEMP (&inter_48)
+#define HG_FONT_WEATHER_ICON (&icons_18)
+#define HG_ICON_LOCATION   "\uE0C8"
+#define HG_ICON_WIND       "\uEFD8"
+#define HG_ICON_PARTICLES  "\uE3EA"
+#define HG_ICON_HOME       "\uE88A"
+#define HG_ICON_DROP       "\uE798"
+#define HG_ICON_SUN        "\uE430"
 
 #endif

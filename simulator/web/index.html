@@ -56,12 +56,27 @@
         <label>Minute <input id="minute" type="number" min="0" max="59" value="8"></label>
         <label><input id="valid-time" type="checkbox" checked>Valid time</label><br>
         <label>Wi-Fi <select id="wifi"><option value="2">Connected</option><option value="1">Connecting</option><option value="0">Disconnected</option></select></label>
-        <label>Sample <select id="sample"><option value="1">Ready</option><option value="0">Waiting</option><option value="2">Stale</option><option value="3">Paused</option><option value="4">Unavailable</option><option value="5">Error (last good)</option></select></label><br>
-        <label>Lux <input id="lux" type="number" value="100" min="0" max="100000"></label>
-        <label>Outdoor C <input id="outdoor" type="number" value="18" min="-100" max="100"></label>
-        <label>Indoor C <input id="indoor" type="number" value="22" min="-100" max="100"></label>
-        <label>Humidity % <input id="humidity" type="number" value="45" min="0" max="100"></label>
-        <label>AQI <input id="aqi" type="number" value="32" min="0" max="500"></label>
+        <label>Lux <input id="lux" type="number" value="100" min="0" max="100000"></label><br>
+        <label>Weather <select id="status"><option value="1">Ready</option><option value="0">Fetching</option><option value="2">Stale</option><option value="4">Unavailable</option><option value="5">Error (last good)</option></select></label>
+        <label>Condition <select id="sky"><option value="0">Unknown</option><option value="1">Clear</option><option value="2" selected>Partly cloudy</option><option value="3">Cloudy</option><option value="4">Fog</option><option value="5">Drizzle</option><option value="6">Rain</option><option value="7">Heavy rain</option><option value="8">Freezing rain</option><option value="9">Snow</option><option value="10">Heavy snow</option><option value="11">Thunderstorm</option><option value="12">Hail</option></select></label><br>
+        <label>Outdoor C <input id="outdoor" type="number" value="18" min="-60" max="60"></label>
+        <label>Feels C <input id="feels" type="number" value="17" min="-60" max="60"></label>
+        <label>High C <input id="high" type="number" value="22" min="-60" max="60"></label>
+        <label>Low C <input id="low" type="number" value="11" min="-60" max="60"></label><br>
+        <label>Wind km/h <input id="wind" type="number" value="12" min="0" max="250"></label>
+        <label>Gust km/h <input id="gust" type="number" value="20" min="0" max="300"></label>
+        <label>UV <input id="uv" type="number" value="5" min="0" max="15"></label>
+        <label>Rain % <input id="rain" type="number" value="10" min="0" max="100"></label><br>
+        <label>Outdoor AQI <input id="aqi" type="number" value="32" min="0" max="500"></label>
+        <label>Air <select id="airStatus"><option value="1">Ready</option><option value="0">Fetching</option><option value="2">Stale</option>        <option value="4">Unavailable</option><option value="5">Error (last good)</option></select></label><br>
+        <label>Indoor sensor <select id="indoorStatus"><option value="1">Ready</option><option value="0">Waiting</option><option value="2">Stale</option><option value="3">Paused</option><option value="4">Unavailable</option><option value="5">Error (last good)</option></select></label>
+        <label>Indoor C <input id="indoor" type="number" value="22" min="-40" max="80"></label>
+        <label>Humidity % <input id="humidity" type="number" value="45" min="0" max="100"></label><br>
+        <label>CO2 ppm <input id="co2" type="number" value="650" min="0" max="40000"></label>
+        <label>PM2.5 <input id="pm25" type="number" value="4" min="0" max="1000"></label>
+        <label>VOC index <input id="voc" type="number" value="90" min="0" max="500"></label><br>
+        <label>Units <select id="units"><option value="0">Metric</option><option value="1">Imperial</option></select></label>
+        <span class="hint">(changing units reboots the preview, as on the device)</span><br>
         <button id="apply">Apply external inputs</button>
       </fieldset>
       <details open><summary>Policy diagnostics (simulated, not hardware measurements)</summary><pre id="diagnostics"></pre></details>

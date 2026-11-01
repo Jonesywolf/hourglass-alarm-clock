@@ -34,10 +34,11 @@ main → app → (ui | services | input_router)
 - Driver: `include/hg/hal/<name>.h` + `src/hal/<name>.cpp` + pins in `include/hg/hal/pins.h`. Wire it in `src/app/app.cpp` only.
 - Domain logic: `include/hg/services/<name>.h` + `src/services/<name>.cpp`.
 - Pins that are not wired yet stay `-1` in `pins.h`.
+- Weather icon: add an entry to `tools/icons/icons.json`, run `platformio run -t icons`, and map it in `src/ui/weather_icons.cpp`. Screens never reference icon images directly. Glance/outlier rules live in `services/glance`; wording lives in `src/ui/weather_format.cpp`.
 
 ## Edit one module
 
-Change `include/hg/<area>/<mod>.h` and `src/<area>/<mod>.cpp` only. Do not open generated font `.c` files under `src/ui/assets/fonts/`. Do not open unrelated screens to change Wi-Fi, NTP, or hardware.
+Change `include/hg/<area>/<mod>.h` and `src/<area>/<mod>.cpp` only. Do not open generated font `.c` files under `src/ui/assets/fonts/` or generated image `.c` files under `src/ui/assets/icons/`. Do not open unrelated screens to change Wi-Fi, NTP, or hardware.
 
 `src/app/input_router.cpp` is the only place that interprets touch/encoder. Rewrite it when UX changes; do not leak that policy into HAL or screens.
 
@@ -91,7 +92,7 @@ Secrets stay in gitignored `include/secrets.h`. Copy `include/secrets.example.h`
 - Only the Arduino UI task calls LVGL or mutates navigation/alarm/effect policy.
   Never add sensor/network/flash/audio waits to that task. App connects workers
   through bounded POD handoffs; see [runtime ownership](README.md#runtime-ownership).
-- Keep I2C in the sensor worker. Preserve snapshot validity/freshness/error status,
+- Keep I2C in the sensor worker and HTTPS in the weather worker. Preserve snapshot validity/freshness/error status,
   output generation/stop semantics, and flash-write admission during transitions.
 - For runtime, input, persistence, display, or effect-policy changes, follow the
   [test runbook](test/README). It contains exact PlatformIO commands, required

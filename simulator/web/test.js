@@ -210,6 +210,78 @@ export async function runSimulationTests() {
     await sim.scenario("sound");
     sim.advance(100);
     check(soundCapture === sim.capture(), "Timed sound-editor captures are deterministic");
+
+    const LINE = { none: 0, thunder: 1, indoor: 2, aqi: 3, gusts: 4, heat: 5, cold: 6, uv: 7, briefing: 8 };
+    function anyPixel(x, y, width, height, test) {
+        const p = regionPixels(x, y, width, height);
+        for (let i = 0; i < p.length; i += 3) if (test(p[i], p[i + 1], p[i + 2])) return true;
+        return false;
+    }
+    const sunny = (r, g, b) => r > 200 && g > 140 && b < 90;
+    const notRed = (r, g, b) => g > r * 0.25 + 8 || b > r * 0.25 + 8;
+    await sim.scenario("clock");
+    check(sim.state().weather.showWeather && sim.state().weather.glanceLine === LINE.none,
+        "Calm weather shows the chip with no context line");
+    check(anyPixel(6, 4, 40, 40, sunny), "Clock glance icon renders in full color");
+    for (const [name, line] of [["glanceStorm", LINE.thunder], ["glanceStuffy", LINE.indoor],
+        ["glanceSmoke", LINE.aqi], ["glanceGusts", LINE.gusts], ["glanceHeat", LINE.heat]]) {
+        await sim.scenario(name);
+        check(sim.state().weather.glanceLine === line, `${name} selects glance line ${line}`);
+    }
+    check(sim.state().weather.indoorLevel === 0 || sim.state().weather.indoorLevel === 1,
+        "Default indoor air rates Good");
+    await sim.reset({ environment: { sky: 1, outdoor: -20, high: -12, low: -24 } });
+    check(sim.state().weather.glanceLine === LINE.cold, "Bitter cold selects cold line");
+    await sim.reset({ environment: { sky: 1, uv: 9 } });
+    check(sim.state().weather.glanceLine === LINE.uv, "High UV selects UV line");
+    await sim.reset({ environment: { sky: 11, co2: 1800 } });
+    check(sim.state().weather.glanceLine === LINE.thunder, "Active storm outranks stuffy indoor air");
+    await sim.scenario("glanceStuffy");
+    check(sim.state().weather.indoorLevel === 3, "High CO2 rates indoor air Poor");
+    await sim.scenario("briefing");
+    check(!sim.state().alarm.ringing && sim.state().weather.glanceLine === LINE.briefing,
+        "Stopping the alarm shows the day briefing");
+    sim.advance(15 * 60000 - 5000);
+    check(sim.state().weather.glanceLine === LINE.briefing, "Briefing persists inside its window");
+    sim.advance(3000);
+    check(sim.state().weather.glanceLine !== LINE.briefing, "Briefing ends after fifteen minutes");
+    await sim.scenario("snooze");
+    check(sim.state().weather.glanceLine !== LINE.briefing, "Snoozing does not start the briefing");
+    await sim.scenario("glanceNight");
+    check(!anyPixel(0, 0, 320, 240, notRed), "Nightlight clock glance renders red only");
+
+    await sim.scenario("weather");
+    check(sim.state().page === 1 && sim.state().weather.offset === 0, "Weather page starts at now");
+    check(anyPixel(6, 24, 80, 80, sunny), "Weather hero icon renders in full color");
+    rotate(1);
+    check(sim.state().weather.offset === 1, "Encoder scrolls the hourly strip");
+    rotate(1000);
+    check(sim.state().weather.offset === 19, "Hourly scroll clamps at the last full window");
+    rotate(-1000);
+    check(sim.state().weather.offset === 0, "Hourly scroll clamps at now");
+    rotate(3);
+    sim.press(40, "touch");
+    sim.advance(320);
+    sim.press(40, "touch");
+    sim.advance(320);
+    check(sim.state().page === 1 && sim.state().weather.offset === 0,
+        "Leaving the weather page resets the hourly scroll");
+    const metric = sim.capture();
+    await sim.scenario("weatherImperial");
+    await sim.reset({ environment: { sky: 1, outdoor: 31, feels: 34, high: 33, low: 20, uv: 9 } });
+    sim.press(40, "touch");
+    sim.advance(320);
+    const metricHot = sim.capture();
+    await sim.scenario("weatherImperial");
+    check(metricHot !== sim.capture() && metric !== metricHot, "Imperial units change the rendered page");
+    let unitsRejected = false;
+    try { sim.setEnvironment({ units: 0 }); } catch (error) { unitsRejected = error instanceof Error; }
+    check(unitsRejected, "Live unit changes are rejected; units load at boot");
+    await sim.scenario("weatherNightlight");
+    check(!anyPixel(0, 0, 320, 240, notRed), "Nightlight weather page renders red only");
+    await sim.scenario("weatherNoSensor");
+    check(sim.state().weather.indoorLevel === 0, "Missing SEN66 reports unknown indoor air");
+
     for (const name of sim.scenarios) {
         await sim.scenario(name);
         check(sim.state().frames > 0, `Scenario ${name} renders`);

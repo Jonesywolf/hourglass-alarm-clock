@@ -5,7 +5,7 @@
 
 #include "hg/config.h"
 #include "hg/log.h"
-#include "secrets.h"
+#include "secrets_internal.h"
 
 static uint32_t last_retry_ms = 0;
 static uint32_t retry_interval_ms = HG_WIFI_RETRY_INITIAL_MS;
@@ -35,8 +35,8 @@ void hg_wifi_init(void) {
     retry_interval_ms = HG_WIFI_RETRY_INITIAL_MS;
     last_retry_ms = 0;
     last_begin_ms = millis();
-    HG_LOG("wifi", "Connecting to %s\n", WIFI_SSID);
-    WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+    HG_LOG("wifi", "Connecting to %s\n", hg_secret_wifi_ssid());
+    WiFi.begin(hg_secret_wifi_ssid(), hg_secret_wifi_password());
 }
 
 void hg_wifi_update(void) {
@@ -62,7 +62,7 @@ void hg_wifi_update(void) {
     last_retry_ms = now;
     last_begin_ms = now;
     HG_LOG("wifi", "Retrying connection (backoff %lu ms)\n", retry_interval_ms);
-    WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+    WiFi.begin(hg_secret_wifi_ssid(), hg_secret_wifi_password());
 
     uint32_t next_interval = retry_interval_ms << 1U;
     if (next_interval < retry_interval_ms || next_interval > HG_WIFI_RETRY_MAX_MS) {
@@ -90,5 +90,5 @@ void hg_wifi_get_snapshot(hg_wifi_snapshot_t *out) {
 }
 
 const char *hg_wifi_get_target_ssid(void) {
-    return WIFI_SSID;
+    return hg_secret_wifi_ssid();
 }

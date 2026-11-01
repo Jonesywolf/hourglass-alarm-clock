@@ -78,12 +78,21 @@ Scenario loading creates a **fresh WebAssembly instance**, resetting static UI,
 navigation and service state. Settings persist only in memory within one
 instance; no browser storage, device NVS or actual flash writes occur. The
 diagnostics show simulated save requests/completions and unavailable outputs.
-Weather, light, time and Wi-Fi are synthetic; "Preview Wi-Fi" is not a real SSID.
+Weather, indoor air, light, time and Wi-Fi are synthetic; "Preview Wi-Fi" is not a real SSID.
+The weather snapshot is built from a condition preset. Hourly temperatures follow
+low..high, peaking at 3pm. Wet conditions rain for the next four hours; dry ones
+with Rain % >= 50 get rain starting three hours from now. Weather "Unavailable"
+models a failed fetch with no data. Units are read once at boot, like the NVS
+setting, so changing them reloads the preview.
 Stale/paused/error samples retain last-good values, whereas waiting/unavailable
 samples have no valid readings.
 
 Scenarios include clock/weather, disabled alarm, boot/sync/fault, unavailable
-and stale readings, minutes/hours/sound editing, 5/50/55/100% volume, ringing,
+and stale readings, weather page variants (`weatherNight`, `weatherRain`,
+`weatherScroll`, `weatherImperial`, `weatherNightlight`, `weatherNoSensor`,
+`fetching`), each clock-face glance line (`glanceStorm`, `glanceSmoke`,
+`glanceStuffy`, `glanceGusts`, `glanceHeat`, `glanceNight`), the post-alarm
+`briefing` and `briefingOver`, minutes/hours/sound editing, 5/50/55/100% volume, ringing,
 snooze/dismiss confirmations, noon/midnight, night/off and mid-slide. They use
 actual input/alarm policy, seeded settings and external inputs.
 The `colors` scenario is a presentation-only LVGL RGB565 calibration fixture.
@@ -115,9 +124,15 @@ Available API:
 - `press(duration = 80, kind = "encoder")`: press, advance and release.
 - `cancelInputs()`: cancel queued/held inputs using authoritative-state recovery.
 - `setTime(hour, minute, second = 0, valid = true)`.
-- `setEnvironment({wifi, status, lux, outdoor, indoor, humidity, aqi})`:
-  defaults to connected/ready, 100 lux, 18/22 C, 45% humidity, AQI 32.
+- `setEnvironment({...})`: any subset of `wifi`, `lux`; weather `status`,
+  `sky` (condition), `outdoor`, `feels`, `high`, `low` (C), `wind`, `gust` (km/h),
+  `uv`, `rain` (%), `aqi`, `airStatus` (defaults to `status`); indoor
+  `indoorStatus`, `indoor` (C), `humidity`, `co2`, `pm25`, `voc`; and `units`
+  (0 metric, 1 imperial; only via `reset({environment})`). Omitted keys reset to
+  defaults: connected/ready, 100 lux, partly cloudy 18 C, AQI 32 and Good indoor air.
   Numeric enum values match [types.h](../include/hg/types.h).
+- `state().weather`: `offset` (hourly scroll), `glanceLine` (`hg_glance_line_t`),
+  `showWeather`, `indoorLevel` (`hg_air_level_t`).
 - `state()`, `capture()`, `pause()`, `play()`, `scenarios`.
 
 For deterministic captures pause, await scenario completion, advance a specified
@@ -142,6 +157,9 @@ Alarm checks also compare arrow pixels at the pulse peak/trough/full cycle,
 ensure the digits stay static, verify each instruction nudges toward its
 control (snooze up, stop right) in single-pixel steps, rests, and returns after a cycle, and verify confirmation glyphs
 render after snooze and stop.
+Weather checks cover every glance line and its priority, the briefing window
+(stop only, not snooze), Poor indoor rating, hourly scroll clamping/reset, units,
+full-color icons in normal mode and red-only pixels in nightlight.
 Failures throw with state diagnostics. The suite leaves a fresh clock preview.
 
 ## What this does not prove
@@ -154,4 +172,5 @@ Failures throw with state diagnostics. The suite leaves a fresh clock preview.
 No device tests or uploads are needed to use the browser preview. Firmware
 regression testing still follows [the device test runbook](../test/README),
 including current port/upload/audio permission and restoring normal firmware.
-Settings UI and sunrise scheduling are not invented by the simulator.
+Settings UI and sunrise scheduling are not invented by the simulator. Real
+Open-Meteo/ipapi responses, TLS and SEN66 readings are not exercised.

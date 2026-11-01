@@ -18,6 +18,8 @@ static bool fired_this_window = false;
 static bool acted = false;
 static uint32_t acted_ms = 0;
 static bool editing = false;
+static bool stopped = false;
+static uint32_t stopped_ms = 0;
 
 static void hg_alarm_request_save(void) {
     hg_alarm_snapshot_t saved = {snapshot.enabled, false, base_hour, base_minute, false,
@@ -56,6 +58,7 @@ void hg_alarm_init(void) {
     fired_this_window = false;
     acted = false;
     editing = false;
+    stopped = false;
 }
 
 static void check_time(const hg_time_snapshot_t &time) {
@@ -159,6 +162,10 @@ void hg_alarm_adjust_volume(int32_t detents) {
 
 void hg_alarm_dismiss(void) {
     HG_LOG("alarm", "dismiss\n");
+    if (snapshot.ringing || snapshot.snoozed) {
+        stopped = true;
+        stopped_ms = millis();
+    }
     hg_alarm_stop_ringing();
     hg_alarm_restore_base();
     fired_this_window = true;
@@ -185,4 +192,11 @@ void hg_alarm_snooze(void) {
 
 bool hg_alarm_toggle_allowed(uint32_t now_ms) {
     return !acted || now_ms - acted_ms >= HG_ALARM_TOGGLE_LOCKOUT_MS;
+}
+
+bool hg_alarm_last_stopped(uint32_t *stopped_at_ms) {
+    if (stopped && stopped_at_ms) {
+        *stopped_at_ms = stopped_ms;
+    }
+    return stopped;
 }

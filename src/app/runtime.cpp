@@ -14,17 +14,20 @@ QueueHandle_t hg_sensor_mailbox = nullptr;
 QueueHandle_t hg_network_mailbox = nullptr;
 QueueHandle_t hg_audio_command_mailbox = nullptr;
 QueueHandle_t hg_audio_status_mailbox = nullptr;
+QueueHandle_t hg_weather_mailbox = nullptr;
 static StaticQueue_t input_state, sensor_state, network_state, audio_command_state,
-                     audio_status_state;
+                     audio_status_state, weather_state;
 static uint8_t input_storage[HG_INPUT_QUEUE_CAPACITY * sizeof(hg_input_event_t)];
 static uint8_t sensor_storage[sizeof(hg_sensor_snapshot_t)];
 static uint8_t network_storage[sizeof(hg_network_snapshot_t)];
 static uint8_t audio_command_storage[sizeof(hg_audio_command_t)];
 static uint8_t audio_status_storage[sizeof(hg_audio_status_t)];
+static uint8_t weather_storage[sizeof(hg_weather_snapshot_t)];
 static StaticEventGroup_t start_state;
 static EventGroupHandle_t start_event = nullptr;
-/* Indexes match the start order table in hg_runtime_start(): input, sensors, network, store, audio. */
-static TaskHandle_t workers[5] = {};
+/* Indexes match the start table in hg_runtime_start(): input, sensors, network, store, audio,
+ * weather. */
+static TaskHandle_t workers[6] = {};
 static portMUX_TYPE mux = portMUX_INITIALIZER_UNLOCKED;
 static hg_runtime_controls_t controls = {1, 1, false, false};
 static hg_runtime_diagnostics_t diagnostics;
@@ -118,6 +121,8 @@ bool hg_runtime_start(void) {
                                           sensor_storage, &sensor_state);
     hg_network_mailbox = xQueueCreateStatic(1, sizeof(hg_network_snapshot_t),
                                            network_storage, &network_state);
+    hg_weather_mailbox = xQueueCreateStatic(1, sizeof(hg_weather_snapshot_t),
+                                           weather_storage, &weather_state);
     start_event = xEventGroupCreateStatic(&start_state);
     const bool audio_enabled = hg_speaker_ready();
     audio_running = false;
@@ -127,7 +132,8 @@ bool hg_runtime_start(void) {
         hg_audio_status_mailbox = xQueueCreateStatic(1, sizeof(hg_audio_status_t),
                                                      audio_status_storage, &audio_status_state);
     }
-    if (!hg_input_queue || !hg_sensor_mailbox || !hg_network_mailbox || !start_event ||
+    if (!hg_input_queue || !hg_sensor_mailbox || !hg_network_mailbox || !hg_weather_mailbox ||
+        !start_event ||
         (audio_enabled && (!hg_audio_command_mailbox || !hg_audio_status_mailbox))) {
         startup_fault = "Runtime queue allocation failed";
         HG_ERROR("runtime", "%s\n", startup_fault);
@@ -137,17 +143,26 @@ bool hg_runtime_start(void) {
     hg_network_snapshot_t network = {};
     xQueueOverwrite(hg_sensor_mailbox, &sensors);
     xQueueOverwrite(hg_network_mailbox, &network);
+    hg_weather_snapshot_t weather = {};
+    weather.status = HG_SAMPLE_WAITING;
+    weather.air_status = HG_SAMPLE_WAITING;
+    xQueueOverwrite(hg_weather_mailbox, &weather);
     if (audio_enabled) {
         hg_audio_status_t audio = {};
         xQueueOverwrite(hg_audio_status_mailbox, &audio);
     }
-    /* Index 3 is the store worker, 4 the optional audio worker. */
+    /* Index 3 is the store worker, 4 the optional audio worker, 5 the weather (HTTPS) worker. */
     TaskFunction_t entries[] = {hg_input_capture_task, hg_sensor_worker_task,
-                               hg_network_worker_task, nullptr, hg_audio_worker_task};
-    const char *names[] = {"hg-input", "hg-sensors", "hg-network", "hg-store", "hg-audio"};
-    const uint32_t stacks[] = {3072, 4096, 6144, 0, 4096};
+                               hg_network_worker_task, nullptr, hg_audio_worker_task,
+                               hg_weather_worker_task};
+    const char *names[] = {"hg-input", "hg-sensors", "hg-network", "hg-store", "hg-audio",
+                           "hg-weather"};
+    /* TLS handshakes need the larger weather stack. */
+    const uint32_t stacks[] = {3072, 4096, 6144, 0, 4096, 12288};
+    /* Priority 0: blocking HTTPS and crypto must never delay input, sensors or Wi-Fi status. */
+    const UBaseType_t priorities[] = {2, 1, 1, 0, 3, 0};
     /* The store worker cannot be stopped, so it starts last; a failed start leaves nothing behind. */
-    const unsigned order[] = {0, 1, 2, 4, 3};
+    const unsigned order[] = {0, 1, 2, 5, 4, 3};
     for (unsigned i : order) {
         if (i == 4 && !audio_enabled) {
             continue;
@@ -159,7 +174,7 @@ bool hg_runtime_start(void) {
         if (ok) {
             ok = i == 3 ? hg_store_start_worker() :
                  xTaskCreatePinnedToCore(entries[i], names[i], stacks[i], nullptr,
-                                         i == 0 ? 2 : i == 4 ? 3 : 1, &workers[i],
+                                         priorities[i], &workers[i],
                                          i == 0 ? ARDUINO_RUNNING_CORE : 0) == pdPASS;
         }
         if (!ok) {

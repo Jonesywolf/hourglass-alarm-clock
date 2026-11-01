@@ -19,6 +19,7 @@ extern QueueHandle_t hg_sensor_mailbox;
 extern QueueHandle_t hg_network_mailbox;
 extern QueueHandle_t hg_audio_command_mailbox;
 extern QueueHandle_t hg_audio_status_mailbox;
+extern QueueHandle_t hg_weather_mailbox;
 
 void hg_runtime_wait_start(void);
 hg_runtime_controls_t hg_runtime_controls(void);
@@ -32,6 +33,7 @@ void hg_input_capture_task(void *);
 void hg_sensor_worker_task(void *);
 void hg_network_worker_task(void *);
 void hg_audio_worker_task(void *);
+void hg_weather_worker_task(void *);
 
 inline void hg_worker_delay(TickType_t *last, uint32_t period_ms) {
     TickType_t period = pdMS_TO_TICKS(period_ms);

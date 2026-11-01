@@ -35,3 +35,21 @@ lv_color_t hg_theme_alarm(void) {
     return hg_theme_tone(0xB0);
 }
 
+
+bool hg_theme_nightlight(void) {
+    return nightlight;
+}
+
+lv_color_t hg_theme_signal(lv_color_t color) {
+    if (!nightlight) {
+        return color;
+    }
+    uint32_t c32 = lv_color_to32(color);
+    uint32_t r = (c32 >> 16) & 0xFF, g = (c32 >> 8) & 0xFF, b = c32 & 0xFF;
+    uint32_t luminance = (r * 54 + g * 183 + b * 19) >> 8;
+    return hg_theme_tone((uint8_t)(luminance < 0x60 ? 0x60 : luminance));
+}
+
+lv_color_t hg_theme_dim(void) {
+    return hg_theme_tone(0x2A);
+}

@@ -15,6 +15,8 @@
 #include "hg/services/brightness.h"
 #include "hg/services/display_mode.h"
 #include "hg/services/effects.h"
+#include "hg/services/glance.h"
+#include "hg/services/location.h"
 #include "hg/services/sound.h"
 #include "hg/services/store.h"
 #include "hg/services/time.h"
@@ -34,6 +36,8 @@ static bool runtime_ready = false;
 static bool display_ready = false;
 static bool fault_shown = false;
 static bool ui_dirty = true;
+static hg_settings_t settings = {HG_DEFAULT_UNITS};
+static bool last_nightlight = false;
 
 #ifdef HG_RUNTIME_TEST
 static bool hide_boot_overlay = false;
@@ -48,14 +52,24 @@ void hg_app_test_hide_boot_overlay(bool hide) {
 
 static void push_screens(const hg_network_snapshot_t *network,
                          const hg_sensor_snapshot_t *sensors) {
-    hg_clock_snapshot_t clock;
+    static hg_clock_snapshot_t clock;
+    static hg_weather_page_snapshot_t page;
     hg_time_get_snapshot(&clock.time);
     clock.wifi = network->wifi;
     hg_alarm_get_snapshot(&clock.alarm);
     hg_input_router_get_alarm_edit(&clock.alarm_edit);
     clock.display_active = hg_display_mode_get() != HG_DISPLAY_MODE_OFF;
+    uint32_t stopped_ms = 0;
+    bool stopped = hg_alarm_last_stopped(&stopped_ms);
+    hg_glance_compute(&network->weather, &sensors->indoor, millis(), stopped, stopped_ms,
+                      &clock.glance);
+    clock.units = settings.units;
     hg_clock_screen_update(&clock);
-    hg_weather_screen_update(&network->weather, &sensors->indoor);
+    page.weather = network->weather;
+    page.indoor = sensors->indoor;
+    hg_input_router_get_weather_view(&page.view);
+    page.units = settings.units;
+    hg_weather_screen_update(&page);
 }
 
 static void sync_audio(hg_effects_snapshot_t *effects) {
@@ -115,6 +129,15 @@ void hg_app_setup(void) {
     bool audio_available = hg_speaker_init();
     bool led_available = hg_led_strip_init();
     hg_effects_set_capabilities(led_available, audio_available);
+    /* NVS reads share the store's Preferences handle, so they finish before its worker starts. */
+    if (!hg_store_load_settings(&settings) || settings.units >= HG_UNITS_COUNT) {
+        settings.units = HG_DEFAULT_UNITS;
+    }
+    hg_location_t location = {};
+    if (!hg_store_load_location(&location)) {
+        location.valid = false;
+    }
+    hg_location_seed(&location);
     runtime_ready = hg_runtime_start();
     if (!runtime_ready) {
         hg_boot_overlay_show_fault(hg_runtime_fault());
@@ -135,6 +158,7 @@ void hg_app_setup(void) {
     hg_brightness_update(&sensors.light);
     hg_display_mode_update();
     hg_theme_set_nightlight(hg_display_mode_get() != HG_DISPLAY_MODE_NORMAL);
+    last_nightlight = hg_display_mode_get() != HG_DISPLAY_MODE_NORMAL;
     hg_network_snapshot_t network;
     hg_runtime_get_network(&network);
     hg_time_snapshot_t time;
@@ -200,6 +224,9 @@ void hg_app_loop(void) {
     hg_input_router_get_alarm_edit(&edit_before);
     hg_alarm_get_snapshot(&alarm_before);
     hg_display_mode_t display_before = hg_display_mode_get();
+    hg_weather_view_t view_before, view_after;
+    hg_input_router_set_weather_hours(network.weather.valid ? network.weather.hourly_count : 0);
+    hg_input_router_get_weather_view(&view_before);
     hg_input_router_set_volume_allowed(navigation_allowed && !hg_overlays_alarm_visible());
     if (hg_input_router_update(navigation_allowed)) {
         last_activity_ms = now;
@@ -207,7 +234,11 @@ void hg_app_loop(void) {
     }
     hg_input_router_get_alarm_edit(&edit_after);
     hg_alarm_get_snapshot(&alarm_after);
-    ui_dirty = ui_dirty || edit_before.field != edit_after.field ||
+    hg_input_router_get_weather_view(&view_after);
+    ui_dirty = ui_dirty || view_before.hourly_offset != view_after.hourly_offset ||
+               alarm_before.ringing != alarm_after.ringing ||
+               alarm_before.snoozed != alarm_after.snoozed ||
+               edit_before.field != edit_after.field ||
                edit_before.hour != edit_after.hour || edit_before.minute != edit_after.minute ||
                edit_before.sound != edit_after.sound ||
                alarm_before.enabled != alarm_after.enabled ||
@@ -229,7 +260,11 @@ void hg_app_loop(void) {
     }
     bool sliding = hg_navigator_is_sliding();
     if (!sliding) {
-        hg_theme_set_nightlight(hg_display_mode_get() != HG_DISPLAY_MODE_NORMAL);
+        bool nightlight = hg_display_mode_get() != HG_DISPLAY_MODE_NORMAL;
+        hg_theme_set_nightlight(nightlight);
+        /* Weather icons are tinted per theme, so a theme change repaints the pages. */
+        ui_dirty = ui_dirty || nightlight != last_nightlight;
+        last_nightlight = nightlight;
         hg_overlays_update();
         if (ui_dirty) {
             push_screens(&network, &sensors);

@@ -22,6 +22,31 @@ static bool press_allowed = false;
 static bool volume_allowed = true;
 static hg_volume_snapshot_t volume;
 static uint32_t last_volume_ms = 0;
+static hg_weather_view_t weather_view;
+static uint8_t weather_hours = 0;
+
+static void weather_rotation(int32_t delta, uint32_t now) {
+    int max_offset = weather_hours > HG_WEATHER_HOURLY_VISIBLE ?
+                     weather_hours - HG_WEATHER_HOURLY_VISIBLE : 0;
+    int64_t offset = (int64_t)weather_view.hourly_offset + delta;
+    offset = offset < 0 ? 0 : offset > max_offset ? max_offset : offset;
+    if (offset != weather_view.hourly_offset) {
+        weather_view.hourly_offset = (uint8_t)offset;
+        hg_effects_request_feedback(HG_FEEDBACK_ALARM_EDIT, now);
+    }
+}
+
+void hg_input_router_set_weather_hours(uint8_t count) {
+    weather_hours = count;
+    int max_offset = count > HG_WEATHER_HOURLY_VISIBLE ? count - HG_WEATHER_HOURLY_VISIBLE : 0;
+    if (weather_view.hourly_offset > max_offset) {
+        weather_view.hourly_offset = (uint8_t)max_offset;
+    }
+}
+
+void hg_input_router_get_weather_view(hg_weather_view_t *out) {
+    *out = weather_view;
+}
 
 static void cancel_volume(void) {
     volume.visible = false;
@@ -123,6 +148,7 @@ void hg_input_router_init(void) {
     volume_allowed = true;
     volume = {};
     last_volume_ms = 0;
+    weather_view = {};
 }
 
 void hg_input_router_get_alarm_edit(hg_alarm_edit_snapshot_t *out) {
@@ -146,6 +172,10 @@ static bool update(bool navigation_allowed, uint32_t now, bool realtime) {
     }
     if (!clock_allowed || generation_changed) {
         cancel_volume();
+    }
+    if (hg_navigator_current() != HG_PAGE_WEATHER) {
+        /* Each visit to the weather page starts at "now". */
+        weather_view.hourly_offset = 0;
     }
 
     for (unsigned i = 0; i < HG_INPUT_QUEUE_CAPACITY; ++i) {
@@ -236,6 +266,9 @@ static bool update(bool navigation_allowed, uint32_t now, bool realtime) {
             switch (hg_navigator_current()) {
                 case HG_PAGE_CLOCK:
                     clock_rotation(event.encoder_delta, now);
+                    break;
+                case HG_PAGE_WEATHER:
+                    weather_rotation(event.encoder_delta, now);
                     break;
                 default:
                     break;

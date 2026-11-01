@@ -4,6 +4,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 
+#include "hg/services/location.h"
 #include "hg/types.h"
 
 void hg_store_init(void);
@@ -11,6 +12,11 @@ bool hg_store_load_alarm(hg_alarm_snapshot_t *out);
 bool hg_store_start_worker(void);
 void hg_store_request_save_alarm(const hg_alarm_snapshot_t *in);
 void hg_store_set_flash_allowed(bool allowed);
+/* Settings and the cached location share the alarm's flash-write admission and retry policy. */
+bool hg_store_load_settings(hg_settings_t *out);
+void hg_store_request_save_settings(const hg_settings_t *in);
+bool hg_store_load_location(hg_location_t *out);
+void hg_store_request_save_location(const hg_location_t *in);
 
 typedef struct {
     uint32_t requested_generation;
@@ -21,6 +27,8 @@ typedef struct {
     uint32_t successful_saves;
     bool pending;
     bool writing;
+    bool settings_pending;
+    bool location_pending;
 } hg_store_status_t;
 
 void hg_store_get_status(hg_store_status_t *out);

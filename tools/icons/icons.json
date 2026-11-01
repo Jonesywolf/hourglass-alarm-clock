@@ -1,0 +1,36 @@
+{
+  "_comment": "Source of truth for generated full-color LVGL images. Run: platformio run -t icons (see README 'Icons'). SVGs are downloaded into cache_dir (gitignored); only the generated .c files and include/hg/ui/icons.h are committed.",
+  "cache_dir": ".icons-cache",
+  "output_dir": "src/ui/assets/icons",
+  "header": "include/hg/ui/icons.h",
+  "renderer": { "npm_package": "@resvg/resvg-js", "version": "2.6.2" },
+  "_viewbox_comment": "Meteocons draw on a 64x64 canvas with generous padding; every icon uses the same crop so sizes stay consistent.",
+  "viewbox": "4 6 56 56",
+  "_background_comment": "Color icons are pre-blended onto this opaque color (must equal hg_theme_bg) so LVGL copies them instead of alpha-blending each frame. Mono masks stay transparent.",
+  "background": "#000000",
+  "sizes": [40, 80],
+  "sources": {
+    "meteocons": {
+      "_comment": "Meteocons v2.0.0 fill set by Bas Milius. Animated SVGs render as their first frame.",
+      "license": "MIT",
+      "url": "https://raw.githubusercontent.com/basmilius/weather-icons/fdd19749b9389f0b4e00d55584b083a7ab2deded/production/fill/all/{file}"
+    }
+  },
+  "icons": [
+    { "name": "clear_day", "source": "meteocons", "file": "clear-day.svg", "sha256": "05ec57e3bf50c723dd83849e24de2ddd91ee49fb7c72c3a80e4061eb723cacde" },
+    { "name": "clear_night", "source": "meteocons", "file": "clear-night.svg", "sha256": "44e47e47c96c54501f577da9294014414a2f716ee0f6fa63a44f981be79337d2" },
+    { "name": "partly_cloudy_day", "source": "meteocons", "file": "partly-cloudy-day.svg", "sha256": "a38dc435238bbce7a7e3126813b12c25d37d4a4c18623f41e96641c61030736a" },
+    { "name": "partly_cloudy_night", "source": "meteocons", "file": "partly-cloudy-night.svg", "sha256": "8de411e16d819233af89f134da8524fd5cf6b3185123aeb36588d904c653e6eb" },
+    { "name": "overcast", "source": "meteocons", "file": "overcast.svg", "sha256": "1503a8ba3c992ffdfa426dd044659a92a74a03801e674a6d6551585447bc1d47" },
+    { "name": "fog_day", "source": "meteocons", "file": "fog-day.svg", "sha256": "555ed6cb3cb90591bf3def916ba208cafc830119b100866bfb7fa7fa2bf3fe9c" },
+    { "name": "fog_night", "source": "meteocons", "file": "fog-night.svg", "sha256": "e89c85ab75c41d9c50291c0740a697ae5ecde1f7f58b37c8a58452ad4d454235" },
+    { "name": "drizzle", "source": "meteocons", "file": "drizzle.svg", "sha256": "548b0cabeaa9e5c55e15b5867c4fee085797c9fba5e2fcc666edde7bcbf02571" },
+    { "name": "rain", "source": "meteocons", "file": "rain.svg", "sha256": "e548655cfe76a605bc4cf35986dbb054ee7a87b58078dad32ce00ab808f872c6" },
+    { "name": "sleet", "source": "meteocons", "file": "sleet.svg", "sha256": "d6b9c4476384f698475df9db372b826de7adf9948771b5c0e086fafe936e386a" },
+    { "name": "snow", "source": "meteocons", "file": "snow.svg", "sha256": "6c51cbcb310caa8edff9d7ea5d984d90a9a918d4796e86147ec0aa5e4a8f0ffb" },
+    { "name": "thunder_day", "source": "meteocons", "file": "thunderstorms-day-rain.svg", "sha256": "889640318c3fa4e468998b13f9d9cecc737ff178b30740b90fdad27c9da57b43" },
+    { "name": "thunder_night", "source": "meteocons", "file": "thunderstorms-night-rain.svg", "sha256": "a6efeb1aacfda2d6b0f15d9083c06085b49f003fd32575553bc14083877b1b71" },
+    { "name": "hail", "source": "meteocons", "file": "hail.svg", "sha256": "74b71a7bf70f22c194a780063024537b6b93934af318cb0fa4576f964d2613b6" },
+    { "name": "not_available", "source": "meteocons", "file": "not-available.svg", "sha256": "71622bd8cd1d7a78fda6f32e4774353f848fee17b7d15101ca78bb9d41473afc" }
+  ]
+}

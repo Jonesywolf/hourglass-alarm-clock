@@ -2,14 +2,12 @@
 
 #include "hg/log.h"
 #include "hg/services/phone_bridge.h"
-#include "hg/services/weather.h"
 #include "hg/services/wifi.h"
 #include "runtime_internal.h"
 
 void hg_network_worker_task(void *) {
     hg_runtime_wait_start();
     hg_wifi_init();
-    hg_weather_init();
     hg_phone_bridge_init();
     hg_network_snapshot_t snapshot = {};
     uint32_t last_update_ms = millis() - 1000U;
@@ -22,10 +20,10 @@ void hg_network_worker_task(void *) {
         if (millis() - last_update_ms >= 1000U) {
             last_update_ms = millis();
             hg_wifi_update();
-            hg_weather_update();
             hg_phone_bridge_update();
             hg_wifi_get_snapshot(&snapshot.wifi);
-            hg_weather_get_snapshot(&snapshot.weather);
+            /* Never waits: the weather worker owns blocking HTTPS. */
+            xQueuePeek(hg_weather_mailbox, &snapshot.weather, 0);
             snapshot.updated_ms = millis();
             snapshot.ready = true;
             xQueueOverwrite(hg_network_mailbox, &snapshot);
