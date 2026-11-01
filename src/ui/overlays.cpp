@@ -4,6 +4,7 @@
 
 #include "hg/config.h"
 #include "hg/ui/fonts.h"
+#include "hg/ui/ui_icon.h"
 #include "hg/ui/theme.h"
 
 typedef enum { OVERLAY_NONE, OVERLAY_RINGING, OVERLAY_CONFIRM } overlay_mode_t;
@@ -71,7 +72,7 @@ static void pulse_alarm_icon(void *object, int32_t phase) {
     level = LV_CLAMP(LV_OPA_60, level, LV_OPA_COVER);
     if (level != alarm_icon_opacity) {
         alarm_icon_opacity = level;
-        lv_obj_set_style_text_opa(static_cast<lv_obj_t *>(object), level, 0);
+        hg_ui_icon_set_opacity(static_cast<lv_obj_t *>(object), level);
         lv_obj_set_style_line_opa(touch_arrow, level, 0);
         lv_obj_set_style_line_opa(knob_arrow, level, 0);
     }
@@ -93,7 +94,7 @@ static void start_alarm_pulse(void) {
     lv_timer_set_period(refresh, 16);
     lv_timer_set_period(animations, 16);
     alarm_icon_opacity = LV_OPA_COVER;
-    lv_obj_set_style_text_opa(icon_label, LV_OPA_COVER, 0);
+    hg_ui_icon_set_opacity(icon_label, LV_OPA_COVER);
     lv_obj_set_style_line_opa(touch_arrow, LV_OPA_COVER, 0);
     lv_obj_set_style_line_opa(knob_arrow, LV_OPA_COVER, 0);
     set_hint_offset(0);
@@ -111,7 +112,7 @@ static void start_alarm_pulse(void) {
 static void stop_alarm_pulse(void) {
     if (icon_label) {
         lv_anim_del(icon_label, pulse_alarm_icon);
-        lv_obj_set_style_text_opa(icon_label, LV_OPA_COVER, 0);
+        hg_ui_icon_set_opacity(icon_label, LV_OPA_COVER);
         lv_obj_set_style_line_opa(touch_arrow, LV_OPA_COVER, 0);
         lv_obj_set_style_line_opa(knob_arrow, LV_OPA_COVER, 0);
         set_hint_offset(0);
@@ -172,9 +173,7 @@ static void create_volume(void) {
     lv_obj_set_style_bg_opa(volume_bar, LV_OPA_COVER, LV_PART_INDICATOR);
     lv_obj_set_style_radius(volume_bar, 4, LV_PART_MAIN);
     lv_obj_set_style_radius(volume_bar, 4, LV_PART_INDICATOR);
-    volume_icon = lv_label_create(volume_root);
-    lv_obj_set_style_text_font(volume_icon, HG_FONT_VOLUME_ICON, 0);
-    lv_label_set_text(volume_icon, HG_ICON_VOLUME_HIGH);
+    volume_icon = hg_ui_icon_create(volume_root, HG_UI_ICON_SPEAKER_HIGH, 14);
     volume_icon_high = true;
     lv_obj_align(volume_icon, LV_ALIGN_BOTTOM_MID, 0, -4);
     lv_obj_clear_flag(volume_icon, LV_OBJ_FLAG_CLICKABLE);
@@ -198,13 +197,13 @@ void hg_overlays_set_volume(const hg_volume_snapshot_t *volume) {
             lv_obj_set_style_bg_color(volume_root, bg, 0);
             lv_obj_set_style_bg_color(volume_bar, fg, LV_PART_MAIN);
             lv_obj_set_style_bg_color(volume_bar, fg, LV_PART_INDICATOR);
-            lv_obj_set_style_text_color(volume_icon, fg, 0);
+            hg_ui_icon_set_color(volume_icon, fg);
         }
         lv_bar_set_value(volume_bar, volume->volume_pct, LV_ANIM_OFF);
         bool high = volume->volume_pct > 50;
         if (high != volume_icon_high) {
             volume_icon_high = high;
-            lv_label_set_text(volume_icon, high ? HG_ICON_VOLUME_HIGH : HG_ICON_VOLUME_LOW);
+            hg_ui_icon_set(volume_icon, high ? HG_UI_ICON_SPEAKER_HIGH : HG_UI_ICON_SPEAKER_LOW, 14);
         }
     }
     if (!show && (volume->dismiss_immediately || mode != OVERLAY_NONE)) {
@@ -288,7 +287,7 @@ static void apply_colors(void) {
     last_alarm = alarm;
     have_last_colors = true;
     lv_obj_set_style_bg_color(root, bg, 0);
-    lv_obj_set_style_text_color(icon_label, alarm, 0);
+    hg_ui_icon_set_color(icon_label, alarm);
     lv_obj_set_style_text_color(time_label, fg, 0);
     lv_obj_set_style_text_color(title_label, fg, 0);
     lv_obj_set_style_line_color(touch_arrow, hg_theme_muted(), 0);
@@ -307,15 +306,14 @@ static void create(void) {
     lv_obj_clear_flag(root, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_align(root, LV_ALIGN_CENTER, 0, 0);
 
-    icon_label = make_label(HG_FONT_ALARM_ICON);
-    lv_label_set_text(icon_label, HG_ICON_ALARM);
+    icon_label = hg_ui_icon_create(root, HG_UI_ICON_ALARM, 72);
     lv_obj_align(icon_label, LV_ALIGN_TOP_MID, 0, 14);
 
     title_label = make_label(HG_FONT_STATUS);
-    lv_obj_align(title_label, LV_ALIGN_TOP_MID, 0, 84);
+    lv_obj_align(title_label, LV_ALIGN_TOP_MID, 0, 90);
 
     time_label = make_label(HG_FONT_ALARM);
-    lv_obj_align(time_label, LV_ALIGN_TOP_MID, 0, 104);
+    lv_obj_align(time_label, LV_ALIGN_TOP_MID, 0, 112);
 
     touch_text = make_label(HG_FONT_STATUS);
     lv_label_set_text(touch_text, "Tap to snooze");
@@ -349,7 +347,7 @@ static void set_time_text(const hg_alarm_snapshot_t *alarm) {
         lv_obj_set_style_text_font(time_label, HG_FONT_ALARM, 0);
         lv_label_set_text_fmt(time_label, "%d:%02d %s", hour12, alarm->minute,
                              alarm->hour >= 12 ? "pm" : "am");
-        lv_obj_align(time_label, LV_ALIGN_TOP_MID, 0, 104);
+        lv_obj_align(time_label, LV_ALIGN_TOP_MID, 0, 112);
     }
 }
 
@@ -365,7 +363,7 @@ static void show_ringing(const hg_alarm_snapshot_t *alarm) {
     }
     mode = OVERLAY_RINGING;
     lv_obj_clear_flag(title_label, LV_OBJ_FLAG_HIDDEN);
-    lv_obj_set_style_text_font(icon_label, HG_FONT_ALARM_EMBLEM, 0);
+    hg_ui_icon_set(icon_label, HG_UI_ICON_ALARM, 48);
     lv_obj_align(icon_label, LV_ALIGN_TOP_MID, 0, 72);
     set_time_text(alarm);
     lv_obj_clear_flag(time_label, LV_OBJ_FLAG_HIDDEN);
@@ -385,12 +383,12 @@ static void show_confirm(const hg_alarm_snapshot_t *alarm) {
         create();
     }
     mode = OVERLAY_CONFIRM;
-    lv_obj_set_style_text_font(icon_label, HG_FONT_ALARM_ICON, 0);
+    hg_ui_icon_set(icon_label, HG_UI_ICON_ALARM, 72);
     lv_obj_align(icon_label, LV_ALIGN_TOP_MID, 0, 14);
     confirm_until_ms = lv_tick_get() + HG_ALARM_CONFIRM_MS;
     lv_label_set_text(title_label, alarm->snoozed ? "Snoozed until" :
                                    alarm->enabled ? "Next alarm" : "Alarm off");
-    lv_obj_align(title_label, LV_ALIGN_TOP_MID, 0, 84);
+    lv_obj_align(title_label, LV_ALIGN_TOP_MID, 0, 90);
     lv_obj_clear_flag(title_label, LV_OBJ_FLAG_HIDDEN);
     if (alarm->enabled) {
         set_time_text(alarm);

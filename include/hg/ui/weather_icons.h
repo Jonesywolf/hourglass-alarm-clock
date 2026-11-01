@@ -16,4 +16,7 @@ typedef enum {
 void hg_wx_icon_apply(lv_obj_t *img, hg_weather_condition_t condition, bool is_day,
                       hg_wx_icon_size_t size, bool muted);
 
+/* Center the visible artwork and temperature glyphs, excluding transparent/font padding. */
+void hg_wx_icon_align_temperature(lv_obj_t *img, lv_obj_t *temperature, lv_coord_t center_y);
+
 #endif

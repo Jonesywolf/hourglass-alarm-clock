@@ -19,6 +19,7 @@
 #include "hg/ui/fonts.h"
 #include "hg/ui/overlays.h"
 #include "hg/ui/theme.h"
+#include "hg/ui/ui_icon.h"
 
 static bool active;
 static uint32_t now_ms;
@@ -277,12 +278,12 @@ void test_volume_panel_animation_and_cancellation(void) {
     TEST_ASSERT_EQUAL(0, lv_bar_get_min_value(bar));
     TEST_ASSERT_EQUAL(100, lv_bar_get_max_value(bar));
     lv_obj_t *icon = lv_obj_get_child(root, 1);
-    TEST_ASSERT_EQUAL_STRING(HG_ICON_VOLUME_HIGH, lv_label_get_text(icon));
+    TEST_ASSERT_EQUAL(HG_UI_ICON_SPEAKER_HIGH, hg_ui_icon_get_asset(icon)->id);
     for (uint8_t pct : {5, 50, 55, 100, 50}) {
         snap.volume_pct = pct;
         hg_overlays_set_volume(&snap);
-        TEST_ASSERT_EQUAL_STRING(pct > 50 ? HG_ICON_VOLUME_HIGH : HG_ICON_VOLUME_LOW,
-                                  lv_label_get_text(icon));
+        TEST_ASSERT_EQUAL(pct > 50 ? HG_UI_ICON_SPEAKER_HIGH : HG_UI_ICON_SPEAKER_LOW,
+                          hg_ui_icon_get_asset(icon)->id);
     }
     snap.visible = false;
     hg_overlays_set_volume(&snap);
@@ -303,7 +304,7 @@ void test_volume_panel_animation_and_cancellation(void) {
     TEST_ASSERT_TRUE(hg_overlays_test_volume(&x, &value));
     TEST_ASSERT_EQUAL(HG_DISP_HOR_RES - 28, x);
     TEST_ASSERT_EQUAL(65, value);
-    TEST_ASSERT_EQUAL_STRING(HG_ICON_VOLUME_HIGH, lv_label_get_text(icon));
+    TEST_ASSERT_EQUAL(HG_UI_ICON_SPEAKER_HIGH, hg_ui_icon_get_asset(icon)->id);
     TEST_ASSERT_EQUAL_UINT32(lv_color_to32(hg_theme_fg()),
         lv_color_to32(lv_obj_get_style_bg_color(bar, LV_PART_INDICATOR)));
     snap.visible = false;

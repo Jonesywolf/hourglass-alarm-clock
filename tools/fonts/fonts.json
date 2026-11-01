@@ -6,18 +6,6 @@
   "variation_tool": { "pip_package": "fonttools", "version": "4.67.0" },
   "defaults": { "bpp": 4, "compress": false },
   "sources": {
-    "material-icons-outlined": {
-      "_comment": "Google Material Icons (Outlined). Icon names resolve through the .codepoints file.",
-      "license": "Apache-2.0",
-      "file": "MaterialIconsOutlined-Regular.otf",
-      "url": "https://raw.githubusercontent.com/google/material-design-icons/49d4db35df873165d6bd6ba09b063c7dafbac2f4/font/MaterialIconsOutlined-Regular.otf",
-      "sha256": "b63fa9edd75e3c20328e04ad31dcc38ce76411f3f9ea1a1ff87f49e5ba874b05",
-      "names": {
-        "file": "MaterialIconsOutlined-Regular.codepoints",
-        "url": "https://raw.githubusercontent.com/google/material-design-icons/49d4db35df873165d6bd6ba09b063c7dafbac2f4/font/MaterialIconsOutlined-Regular.codepoints",
-        "sha256": "c57e7279a7ef29925cd98e538c618a037a42b43120576f4660a6732c7a5a4d4a"
-      }
-    },
     "inter": {
       "_comment": "Google Fonts Inter variable font. Pick an instance per font with 'variations' (opsz 32 = Inter Display).",
       "license": "OFL-1.1",
@@ -27,41 +15,6 @@
     }
   },
   "fonts": [
-    {
-      "_comment": "Wi-Fi status and transient volume glyphs, clock-screen size.",
-      "name": "icons_14",
-      "source": "material-icons-outlined",
-      "size": 14,
-      "icons": ["signal_wifi_bad", "signal_wifi_0_bar", "network_wifi_1_bar", "network_wifi_2_bar", "network_wifi_3_bar", "signal_wifi_4_bar", "volume_down", "volume_up", "music_note"]
-    },
-    {
-      "_comment": "Wi-Fi status glyphs, boot-overlay size.",
-      "name": "icons_72",
-      "source": "material-icons-outlined",
-      "size": 72,
-      "icons": ["signal_wifi_bad", "signal_wifi_0_bar", "network_wifi_1_bar", "network_wifi_2_bar", "network_wifi_3_bar", "signal_wifi_4_bar"]
-    },
-    {
-      "_comment": "Alarm overlay hint icons: snooze (touch) and stop (encoder).",
-      "name": "icons_36",
-      "source": "material-icons-outlined",
-      "size": 36,
-      "icons": ["snooze", "alarm_off"]
-    },
-    {
-      "_comment": "Alarm overlay hero icon.",
-      "name": "icons_alarm_72",
-      "source": "material-icons-outlined",
-      "size": 72,
-      "icons": ["alarm"]
-    },
-    {
-      "_comment": "Ringing emblem; confirmations retain the existing 72px alarm glyph.",
-      "name": "icons_alarm_48",
-      "source": "material-icons-outlined",
-      "size": 48,
-      "icons": ["alarm"]
-    },
     {
       "_comment": "Clock digits only: 0-9 and ':'.",
       "name": "inter_96",
@@ -78,13 +31,6 @@
       "variations": { "opsz": 32, "wght": 400 },
       "ranges": ["45", "48-58", "176"],
       "text": "\u2212"
-    },
-    {
-      "_comment": "Weather-page chrome (tinted by the theme): location, wind, outdoor particles, indoor, precipitation, UV.",
-      "name": "icons_18",
-      "source": "material-icons-outlined",
-      "size": 18,
-      "icons": ["location_on", "air", "grain", "home", "water_drop", "wb_sunny"]
     },
     {
       "_comment": "Body/status text (HG_FONT_STATUS) and LVGL's default font. Printable ASCII, Latin-1 (includes the degree sign), plus typographic punctuation: en/em dash, curly quotes, bullet, ellipsis, minus.",

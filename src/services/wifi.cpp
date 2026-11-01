@@ -1,4 +1,5 @@
 #include "hg/services/wifi.h"
+#include "hg/services/wifi_signal.h"
 
 #include <Arduino.h>
 #include <WiFi.h>
@@ -10,22 +11,6 @@
 static uint32_t last_retry_ms = 0;
 static uint32_t retry_interval_ms = HG_WIFI_RETRY_INITIAL_MS;
 static uint32_t last_begin_ms = 0;
-
-static hg_wifi_bars_t bars_from_rssi(int rssi) {
-    if (rssi >= -55) {
-        return HG_WIFI_BARS_4;
-    }
-    if (rssi >= -65) {
-        return HG_WIFI_BARS_3;
-    }
-    if (rssi >= -75) {
-        return HG_WIFI_BARS_2;
-    }
-    if (rssi >= -85) {
-        return HG_WIFI_BARS_1;
-    }
-    return HG_WIFI_BARS_NONE;
-}
 
 void hg_wifi_init(void) {
     WiFi.mode(WIFI_STA);
@@ -80,7 +65,7 @@ void hg_wifi_get_snapshot(hg_wifi_snapshot_t *out) {
     if (WiFi.status() == WL_CONNECTED) {
         out->state = HG_WIFI_CONNECTED;
         out->rssi = WiFi.RSSI();
-        out->bars = bars_from_rssi(out->rssi);
+        out->bars = hg_wifi_bars_from_rssi(out->rssi);
         return;
     }
 

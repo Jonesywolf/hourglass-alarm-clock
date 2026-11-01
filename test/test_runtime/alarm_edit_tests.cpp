@@ -20,6 +20,7 @@
 #include "hg/ui/navigator.h"
 #include "hg/ui/theme.h"
 #include "hg/ui/fonts.h"
+#include "hg/ui/ui_icon.h"
 
 static uint32_t now_ms;
 static bool active = false;
@@ -466,11 +467,10 @@ void test_alarm_sound_editor_and_presentation(void) {
     hg_clock_screen_update(&snap);
     lv_obj_t *label = hg_clock_screen_test_sound_label();
     lv_obj_t *icon = hg_clock_screen_test_sound_icon();
-    TEST_ASSERT_EQUAL_STRING(HG_ICON_MUSIC_NOTE, lv_label_get_text(icon));
+    TEST_ASSERT_EQUAL(HG_UI_ICON_MUSIC_NOTE, hg_ui_icon_get_asset(icon)->id);
     TEST_ASSERT_FALSE(lv_obj_has_flag(icon, LV_OBJ_FLAG_HIDDEN));
     TEST_ASSERT_FALSE(lv_obj_has_flag(icon, LV_OBJ_FLAG_CLICKABLE));
-    lv_font_glyph_dsc_t glyph;
-    TEST_ASSERT_TRUE(lv_font_get_glyph_dsc(HG_FONT_SOUND_ICON, &glyph, 0xE405, 0));
+    TEST_ASSERT_NOT_NULL(hg_ui_icon_get_asset(icon)->foreground);
     TEST_ASSERT_FALSE(lv_obj_has_flag(label, LV_OBJ_FLAG_HIDDEN));
     TEST_ASSERT_EQUAL_STRING("Plucked dawn", lv_label_get_text(label));
     lv_obj_update_layout(label);
@@ -491,7 +491,7 @@ void test_alarm_sound_editor_and_presentation(void) {
     TEST_ASSERT_EQUAL(lv_color_to32(hg_theme_bg()),
                       lv_color_to32(lv_obj_get_style_text_color(label, 0)));
     TEST_ASSERT_EQUAL(lv_color_to32(hg_theme_bg()),
-                      lv_color_to32(lv_obj_get_style_text_color(icon, 0)));
+                      lv_color_to32(hg_ui_icon_get_color(icon)));
     hold();
     step(1, false, true);
     TEST_ASSERT_EQUAL(HG_ALARM_SOUND_PLUCKED, alarm().sound);

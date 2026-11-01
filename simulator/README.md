@@ -57,6 +57,13 @@ After C/C++/font or web changes, rebuild and reload the page. This is not hot
 reload. Stop the server with Ctrl+C when done. Agent validation servers should
 be stopped; only keep a persistent server when requested and confirm readiness.
 
+Phosphor UI weight is selected in `tools/icons/ui_icons.json` and generated with
+`platformio run -t ui-icons` before rebuilding. All six weights, including true
+Duotone, use the production `hg/ui/ui_icon.h` widget. There is no browser-only or
+runtime weight selector. Keep Meteocons weather artwork separate. Use
+`tools\icons\generate_ui_icons.py --preview` for native per-icon PNGs, then inspect
+the actual screens in Regular and Duotone (including pulse extrema and night mode).
+
 ## Preview controls
 
 The display has a **320 x 240** backing canvas and integer-scaled presentation.
@@ -124,7 +131,7 @@ Available API:
 - `press(duration = 80, kind = "encoder")`: press, advance and release.
 - `cancelInputs()`: cancel queued/held inputs using authoritative-state recovery.
 - `setTime(hour, minute, second = 0, valid = true)`.
-- `setEnvironment({...})`: any subset of `wifi`, `lux`; weather `status`,
+- `setEnvironment({...})`: any subset of `wifi`, `rssi` (-127..0 dBm), `lux`; weather `status`,
   `sky` (condition), `outdoor`, `feels`, `high`, `low` (C), `wind`, `gust` (km/h),
   `uv`, `rain` (%), `aqi`, `airStatus` (defaults to `status`); indoor
   `indoorStatus`, `indoor` (C), `humidity`, `co2`, `pm25`, `voc`; and `units`
@@ -134,6 +141,11 @@ Available API:
 - `state().weather`: `offset` (hourly scroll), `glanceLine` (`hg_glance_line_t`),
   `showWeather`, `indoorLevel` (`hg_air_level_t`).
 - `state()`, `capture()`, `pause()`, `play()`, `scenarios`.
+- `state().uiIconWeight` reports the compiled Phosphor weight; `state().wifi`
+  reports synthetic RSSI and the four-level production signal classification.
+- `iconSample(opacity = 255, night = false)` draws a presentation-only 18 px
+  Phosphor drop fixture over black for layer/tint assertions. Use a fresh scenario
+  first, and reset afterward; this is not physical-input policy.
 
 For deterministic captures pause, await scenario completion, advance a specified
 duration, then capture. No arbitrary wall-clock screenshot sleep is needed.
@@ -160,6 +172,13 @@ render after snooze and stop.
 Weather checks cover every glance line and its priority, the briefing window
 (stop only, not snooze), Poor indoor rating, hourly scroll clamping/reset, units,
 full-color icons in normal mode and red-only pixels in nightlight.
+Phosphor checks cover four distinct signal drawings, RSSI boundaries/disconnection,
+transparent monochrome interiors, Duotone's 20% shade, and tinted faded layers.
+Temperature alignment checks compare visible pixel bounds (within 1.5 px) against
+the weather artwork on both surfaces, across day/night conditions and signed
+temperatures. They also cover the fetching placeholder, subtitle clearance and
+location-header visibility.
+Clock Wi-Fi coverage must span at least 18 visible pixels within its 22 px asset.
 Failures throw with state diagnostics. The suite leaves a fresh clock preview.
 
 ## What this does not prove

@@ -3,6 +3,7 @@
 #include <lvgl.h>
 
 #include "hg/ui/fonts.h"
+#include "hg/ui/ui_icon.h"
 #include "hg/ui/theme.h"
 
 static bool active = false;
@@ -12,12 +13,11 @@ static lv_obj_t *status_label;
 static uint8_t dot_phase = 0;
 static uint8_t icon_phase = 0;
 
-static const char *const wifi_icon_frames[] = {
-    "\uF0B0",  // 0 bars
-    "\uEBE4",  // 1 bar
-    "\uEBD6",  // 2 bars
-    "\uEBE1",  // 3 bars
-    "\uE1D8",  // 4 bars
+static const hg_ui_icon_id_t wifi_icon_frames[] = {
+    HG_UI_ICON_WIFI_NONE,
+    HG_UI_ICON_WIFI_LOW,
+    HG_UI_ICON_WIFI_MEDIUM,
+    HG_UI_ICON_WIFI_HIGH,
 };
 
 static void hg_boot_overlay_set_status_connecting(const char *ssid) {
@@ -52,7 +52,7 @@ static void hg_boot_overlay_set_status_syncing_time(void) {
 }
 
 static void hg_boot_overlay_set_icon_frame(void) {
-    lv_label_set_text(icon_label, wifi_icon_frames[icon_phase]);
+    hg_ui_icon_set(icon_label, wifi_icon_frames[icon_phase], 72);
     icon_phase = (icon_phase + 1U) % (sizeof(wifi_icon_frames) / sizeof(wifi_icon_frames[0]));
 }
 
@@ -71,11 +71,7 @@ static void hg_boot_overlay_show(void) {
     lv_obj_align(overlay, LV_ALIGN_CENTER, 0, 0);
     lv_obj_move_foreground(overlay);
 
-    icon_label = lv_label_create(overlay);
-    lv_obj_set_style_text_font(icon_label, HG_FONT_WIFI_ICON, 0);
-    lv_obj_set_style_text_color(icon_label, hg_theme_fg(), 0);
-    lv_label_set_text(icon_label, wifi_icon_frames[0]);
-    lv_obj_set_style_text_align(icon_label, LV_TEXT_ALIGN_CENTER, 0);
+    icon_label = hg_ui_icon_create(overlay, wifi_icon_frames[0], 72);
     lv_obj_clear_flag(icon_label, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_align(icon_label, LV_ALIGN_CENTER, 0, -24);
 
@@ -128,7 +124,7 @@ void hg_boot_overlay_update(
 
     if (icon_label) {
         hg_boot_overlay_set_icon_frame();
-        lv_obj_set_style_text_color(icon_label, hg_theme_fg(), 0);
+        hg_ui_icon_set_color(icon_label, hg_theme_fg());
     }
 
     if (status_label) {
@@ -160,6 +156,6 @@ bool hg_boot_overlay_is_active(void) {
 
 void hg_boot_overlay_show_fault(const char *message) {
     hg_boot_overlay_show();
-    lv_label_set_text(icon_label, "!");
+    hg_ui_icon_set(icon_label, HG_UI_ICON_WARNING, 72);
     lv_label_set_text(status_label, message);
 }

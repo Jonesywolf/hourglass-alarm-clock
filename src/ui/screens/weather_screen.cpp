@@ -7,6 +7,7 @@
 #include "hg/config.h"
 #include "hg/ui/fonts.h"
 #include "hg/ui/theme.h"
+#include "hg/ui/ui_icon.h"
 #include "hg/ui/weather_format.h"
 #include "hg/ui/weather_icons.h"
 
@@ -73,7 +74,7 @@ static void set_visible(lv_obj_t *obj, bool visible) {
     }
 }
 
-static void make_chip(lv_obj_t *row, chip_t *chip, const char *glyph) {
+static void make_chip(lv_obj_t *row, chip_t *chip, hg_ui_icon_id_t icon) {
     chip->box = lv_obj_create(row);
     lv_obj_remove_style_all(chip->box);
     lv_obj_set_size(chip->box, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
@@ -81,8 +82,7 @@ static void make_chip(lv_obj_t *row, chip_t *chip, const char *glyph) {
     lv_obj_set_flex_align(chip->box, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER,
                           LV_FLEX_ALIGN_CENTER);
     lv_obj_set_style_pad_column(chip->box, 4, 0);
-    chip->icon = make_label(chip->box, HG_FONT_WEATHER_ICON);
-    lv_label_set_text(chip->icon, glyph);
+    chip->icon = hg_ui_icon_create(chip->box, icon, 18);
     chip->text = make_label(chip->box, HG_FONT_STATUS);
     chip->color = 0;
     chip->icon_color = 0;
@@ -101,7 +101,7 @@ static void set_chip(chip_t *chip, const char *text, lv_color_t color) {
     value = lv_color_to32(muted);
     if (value != chip->icon_color) {
         chip->icon_color = value;
-        lv_obj_set_style_text_color(chip->icon, muted, 0);
+        hg_ui_icon_set_color(chip->icon, muted);
     }
 }
 
@@ -113,8 +113,11 @@ void hg_weather_screen_create(lv_obj_t *parent) {
     lv_obj_clear_flag(parent, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_set_style_bg_color(parent, hg_theme_bg(), 0);
 
-    location_icon = make_label(parent, HG_FONT_WEATHER_ICON);
-    lv_label_set_text(location_icon, HG_ICON_LOCATION);
+    // Centering can move the opaque asset's black padding behind the header.
+    hero_icon = lv_img_create(parent);
+    lv_obj_set_pos(hero_icon, 6, 24);
+
+    location_icon = hg_ui_icon_create(parent, HG_UI_ICON_MAP_PIN, 18);
     lv_obj_set_pos(location_icon, 6, 4);
     location_label = make_label(parent, HG_FONT_STATUS);
     lv_label_set_long_mode(location_label, LV_LABEL_LONG_DOT);
@@ -123,8 +126,6 @@ void hg_weather_screen_create(lv_obj_t *parent) {
     updated_label = make_label(parent, HG_FONT_STATUS);
     lv_obj_align(updated_label, LV_ALIGN_TOP_RIGHT, -8, 5);
 
-    hero_icon = lv_img_create(parent);
-    lv_obj_set_pos(hero_icon, 6, 24);
     temp_label = make_label(parent, HG_FONT_WEATHER_TEMP);
     lv_obj_set_pos(temp_label, 94, 20);
     condition_label = make_label(parent, HG_FONT_STATUS);
@@ -136,13 +137,11 @@ void hg_weather_screen_create(lv_obj_t *parent) {
     lv_obj_set_width(detail_label, 220);
     lv_obj_set_pos(detail_label, 96, 96);
 
-    rain_icon = make_label(parent, HG_FONT_WEATHER_ICON);
-    lv_label_set_text(rain_icon, HG_ICON_DROP);
+    rain_icon = hg_ui_icon_create(parent, HG_UI_ICON_DROP, 18);
     lv_obj_set_pos(rain_icon, 236, 30);
     rain_label = make_label(parent, HG_FONT_STATUS);
     lv_obj_set_pos(rain_label, 258, 31);
-    uv_icon = make_label(parent, HG_FONT_WEATHER_ICON);
-    lv_label_set_text(uv_icon, HG_ICON_SUN);
+    uv_icon = hg_ui_icon_create(parent, HG_UI_ICON_SUN, 18);
     lv_obj_set_pos(uv_icon, 236, 52);
     uv_label = make_label(parent, HG_FONT_STATUS);
     lv_obj_set_pos(uv_label, 258, 53);
@@ -183,13 +182,13 @@ void hg_weather_screen_create(lv_obj_t *parent) {
     lv_obj_set_flex_flow(row, LV_FLEX_FLOW_ROW);
     lv_obj_set_flex_align(row, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER,
                           LV_FLEX_ALIGN_CENTER);
-    make_chip(row, &wind_chip, HG_ICON_WIND);
-    make_chip(row, &aqi_chip, HG_ICON_PARTICLES);
-    make_chip(row, &indoor_chip, HG_ICON_HOME);
+    make_chip(row, &wind_chip, HG_UI_ICON_WIND);
+    make_chip(row, &aqi_chip, HG_UI_ICON_DOTS_NINE);
+    make_chip(row, &indoor_chip, HG_UI_ICON_HOUSE);
 }
 
 static void render_header(const hg_weather_snapshot_t *weather) {
-    lv_obj_set_style_text_color(location_icon, hg_theme_muted(), 0);
+    hg_ui_icon_set_color(location_icon, hg_theme_muted());
     lv_obj_set_style_text_color(location_label, hg_theme_muted(), 0);
     lv_obj_set_style_text_color(updated_label, hg_theme_muted(), 0);
     lv_label_set_text(location_label, weather->location[0] ? weather->location : "Locating\xE2\x80\xA6");
@@ -217,6 +216,7 @@ static void render_hero(const hg_weather_snapshot_t *weather, hg_unit_system_t u
     if (!weather->valid) {
         hg_wx_icon_apply(hero_icon, HG_WX_UNKNOWN, true, HG_WX_ICON_LARGE, true);
         lv_label_set_text(temp_label, "--\xC2\xB0");
+        hg_wx_icon_align_temperature(hero_icon, temp_label, 56);
         lv_label_set_text(condition_label, weather->status == HG_SAMPLE_ERROR ?
                           "Weather unavailable" : "Fetching weather\xE2\x80\xA6");
         lv_label_set_text(detail_label, weather->location[0] ? "Will retry shortly" :
@@ -230,6 +230,7 @@ static void render_hero(const hg_weather_snapshot_t *weather, hg_unit_system_t u
     hg_wx_icon_apply(hero_icon, weather->condition, weather->is_day, HG_WX_ICON_LARGE, muted);
     hg_wx_format_temp(text, sizeof(text), weather->temp_c, units);
     lv_label_set_text(temp_label, text);
+    hg_wx_icon_align_temperature(hero_icon, temp_label, 56);
     lv_label_set_text(condition_label, hg_wx_condition_name(weather->condition));
     hg_wx_format_temp(a, sizeof(a), weather->feels_like_c, units);
     hg_wx_format_temp(b, sizeof(b), weather->high_c, units);
@@ -237,10 +238,10 @@ static void render_hero(const hg_weather_snapshot_t *weather, hg_unit_system_t u
     snprintf(text, sizeof(text), "Feels %s" DOT "H %s  L %s", a, b, c);
     lv_label_set_text(detail_label, text);
 
-    lv_obj_set_style_text_color(rain_icon, hg_wx_rain_color(), 0);
+    hg_ui_icon_set_color(rain_icon, hg_wx_rain_color());
     lv_obj_set_style_text_color(rain_label, fg, 0);
     lv_label_set_text_fmt(rain_label, "%u%%", (unsigned)weather->day_precip_prob_pct);
-    lv_obj_set_style_text_color(uv_icon, hg_theme_signal(lv_color_hex(0xFBBF24)), 0);
+    hg_ui_icon_set_color(uv_icon, hg_theme_signal(lv_color_hex(0xFBBF24)));
     lv_obj_set_style_text_color(uv_label, fg, 0);
     lv_label_set_text_fmt(uv_label, "UV %ld", isnan(weather->uv_max) ? 0L :
                           lroundf(weather->uv_max));

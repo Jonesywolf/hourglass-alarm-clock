@@ -360,14 +360,15 @@ does not verify the cold-boot failure.
 
 Generated LVGL fonts under `src/ui/assets/fonts/` are described by
 [`tools/fonts/fonts.json`](tools/fonts/fonts.json): each entry names a source font
-(Google Fonts / Material Icons, pinned by commit URL and SHA-256), a pixel size, and
-the glyphs to keep. Select glyphs with `icons` (Material icon names), `codepoints`,
-`ranges`, or `text`; variable fonts take `variations` (e.g. Inter `opsz`/`wght`).
+(Inter, pinned by commit URL and SHA-256), a pixel size, and the glyphs to keep.
+Select glyphs with `codepoints`, `ranges`, or `text`; variable fonts take
+`variations` (e.g. Inter `opsz`/`wght`). UI symbols use Phosphor images, not fonts.
 
 ```powershell
 $pio = "$env:USERPROFILE\.platformio\penv\Scripts\platformio.exe"
 & $pio run -t fonts                 # regenerate everything
-$env:HG_FONTS = "icons_36"; & $pio run -t fonts   # only some fonts (comma-separated)
+$env:HG_FONTS = "inter_28"; & $pio run -t fonts   # only some fonts (comma-separated)
+Remove-Item Env:HG_FONTS             # restore the default selection
 & $pio run -t fonts-force           # also re-download sources and reinstall converters
 & "$env:USERPROFILE\.platformio\penv\Scripts\python.exe" tools\fonts\generate_fonts.py --list
 ```
@@ -376,8 +377,80 @@ Source font files are downloaded on demand into the gitignored `.fonts-cache/`
 (`*.ttf` / `*.otf` are also ignored); only the generated `.c` files are committed.
 Node.js is required for `lv_font_conv`; `fonttools` is installed into the cache for
 variable-font instances. After adding a font, declare it in `include/hg/ui/fonts.h`.
-The existing Wi-Fi icon fonts were first generated from Google's TTF; the official
-repository only ships OTF, so regenerating them can change anti-aliasing slightly.
+
+## UI icons (Phosphor)
+
+Wi-Fi, alarm, speaker/music and small weather-page indicators use
+[Phosphor Icons](https://phosphoricons.com/) (MIT). Colorful weather-condition
+illustrations remain Meteocons; the drawn alarm direction arrows are unchanged.
+[`tools/icons/ui_icons.json`](tools/icons/ui_icons.json) is the source of truth for
+official names, sizes, the pinned upstream commit and each weight's SHA-256.
+
+Set its `weight` to `thin`, `light`, `regular` (default), `bold`, `fill`, or
+`duotone`, then regenerate and rebuild. This is **generation/build-time only**:
+the clock has no style setting, and only the selected weight is compiled.
+
+```powershell
+$pio = "$env:USERPROFILE\.platformio\penv\Scripts\platformio.exe"
+$python = "$env:USERPROFILE\.platformio\penv\Scripts\python.exe"
+& $python tools\icons\generate_ui_icons.py --list
+& $python tools\icons\generate_ui_icons.py --add bell --sizes 14 18
+& $pio run -t ui-icons
+& $pio run -t ui-icons-force         # re-fetch pinned SVGs and reinstall resvg
+& $python tools\icons\generate_ui_icons.py --preview
+& $pio run -e esp32-s3-devkitc-1
+```
+
+`--add` resolves the official name at the pinned revision, validates every weight,
+and records all six hashes before updating the manifest. Supplying an existing
+name updates its sizes/hashes. Use a name from the pinned Phosphor revision; a newer
+website icon may not exist there. A failed download/name/hash/unsupported SVG is
+an error, not a substitute symbol. Review manifest changes before committing.
+
+The generator reuses the existing resvg tool in `.icons-cache/node/`. Original SVGs,
+layer masks and PNG previews stay in `.icons-cache/phosphor/`. Commit the manifest,
+generated [`ui_icon_assets.h`](include/hg/ui/ui_icon_assets.h), and
+[`src/ui/assets/ui_icons/phosphor.c`](src/ui/assets/ui_icons/phosphor.c); never edit
+generated files or maintain codepoints manually. The complete set is regenerated
+at once, and a compile guard detects header/source weight mismatches.
+`--weight duotone` overrides the manifest for a generation; use `--output-dir PATH`
+for isolated scratch C/header output instead of changing committed assets.
+
+Screens use [`hg/ui/ui_icon.h`](include/hg/ui/ui_icon.h), not image descriptors:
+
+```cpp
+lv_obj_t *icon = hg_ui_icon_create(parent, HG_UI_ICON_BELL, 18);
+hg_ui_icon_set_color(icon, hg_theme_muted());
+lv_obj_align(icon, LV_ALIGN_TOP_RIGHT, -8, 4);
+```
+
+IDs are generated from official names (hyphens become underscores). Sizes must be
+registered. Use `hg_ui_icon_set` for identity/size changes and
+`hg_ui_icon_set_opacity` for animation. Hide, align and delete the stable root
+normally; it is transparent and non-clickable. Monochrome uses one coverage-alpha
+image. True Duotone draws an aligned shade at the upstream 20% opacity below the
+foreground, retaining both theme tint and fade behavior. Some official Duotone
+symbols, such as `wifi-none`, intentionally have no shaded layer.
+
+The current Regular set contains 37,876 mask bytes before descriptors. Duotone adds
+shade masks and a second alpha draw where present; measure device timing rather
+than treating browser checks as proof. Build and visually validate both targets
+after changes, including night mode and alarm pulse phases.
+See the [test runbook](test/README) for device results and unchanged timing limits.
+
+Wi-Fi has four levels: none below -85 dBm, low from -85, medium from -75, and high
+from -65. The existing two-sample clock stabilization remains; the boot animation
+cycles these four drawings.
+The clock uses 22 px Wi-Fi assets for legibility; the boot overlay uses 72 px.
+Temperature/artwork pairs are centered using visible glyph and artwork bounds,
+not transparent image padding or the font's line box. Artwork bounds are cached
+after the first use; the weather artwork itself is unchanged.
+
+Generator checks (standard library, no device):
+
+```powershell
+& $python -m unittest discover -s tools\icons -p "test_*.py"
+```
 
 ## Weather icons
 

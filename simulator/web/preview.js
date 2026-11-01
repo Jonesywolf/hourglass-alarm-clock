@@ -99,6 +99,7 @@ function setTime(hour, minute, second = 0, valid = true) {
 // [min, max, integer, label]; ids match the form controls. airStatus defaults to status.
 const environmentSpec = {
     wifi: [0, 2, true, "Wi-Fi state"], lux: [0, 100000, false, "Lux"],
+    rssi: [-127, 0, true, "Wi-Fi RSSI"],
     status: [0, 5, true, "Weather status"], sky: [0, 12, true, "Condition"],
     outdoor: [-60, 60, false, "Outdoor temperature"], feels: [-60, 60, false, "Feels like"],
     high: [-60, 60, false, "High"], low: [-60, 60, false, "Low"],
@@ -110,7 +111,7 @@ const environmentSpec = {
     units: [0, 1, true, "Units"],
 };
 const environmentDefaults = {
-    wifi: 2, lux: 100, status: 1, sky: 2, outdoor: 18, feels: 17, high: 22, low: 11, wind: 12,
+    wifi: 2, rssi: -55, lux: 100, status: 1, sky: 2, outdoor: 18, feels: 17, high: 22, low: 11, wind: 12,
     gust: 20, uv: 5, rain: 10, aqi: 32, indoorStatus: 1, indoor: 22, humidity: 45, co2: 650,
     pm25: 4, voc: 90, units: 0,
 };
@@ -129,7 +130,7 @@ function setEnvironment(options = {}) {
         throw new Error("Units are read at boot; pass them to reset({ environment })");
     }
     environment = values;
-    call("sim_environment", null, ["number", "number"], [values.wifi, values.lux]);
+    call("sim_environment", null, ["number", "number", "number"], [values.wifi, values.lux, values.rssi]);
     call("sim_weather", null, Array(12).fill("number"), [values.status, values.sky, values.outdoor,
         values.feels, values.high, values.low, values.wind, values.gust, values.uv, values.rain,
         values.aqi, values.airStatus]);
@@ -252,8 +253,15 @@ function capture() {
     paint();
     return canvas.toDataURL("image/png");
 }
+function iconSample(opacity = 255, night = false) {
+    number(opacity, 0, 255, "Icon opacity", true);
+    if (typeof night !== "boolean") throw new Error("Night mode must be a boolean");
+    call("sim_icon_sample", null, ["number", "number"], [opacity, night ? 1 : 0]);
+    return update();
+}
 window.hgPreview = {
     reset, scenario, advance, input, press, cancelInputs, state, setTime, setEnvironment, capture,
+    iconSample,
     play: () => setPlaying(true), pause: () => setPlaying(false),
     scenarios: Object.keys(scenarios),
 };

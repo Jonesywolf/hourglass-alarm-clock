@@ -83,6 +83,39 @@ has been verified by it.
 - Hardware-free asset/converter checks:
   `python -m unittest discover -s tools\audio -p "test_*.py"`; these do not prove
   on-device frame timing, worker behavior or audible wake-up strength.
+- Phosphor generator checks:
+  `python -m unittest discover -s tools\icons -p "test_*.py"` covers named registration,
+  pinned hashes, all six weight outputs, alpha coverage and true Duotone splitting.
+  UI weight is generation/build-time only; generate with `platformio run -t ui-icons`.
+  Run the browser suite and inspect native captures in Regular and Duotone. Restore
+  the manifest-selected Regular assets before the final production build/upload.
+- `ui_icon_tests.cpp`: production RSSI boundaries at -85/-75/-65 dBm, named alpha
+  asset coverage, root sizes, identity changes, tint, foreground/shade opacity
+  relationships, and the official no-shade Duotone case. Existing editor, volume
+  and alarm checks assert the shared icon widget rather than font/codepoint details.
+
+Phosphor migration validation on the authorized ESP32-S3/COM4:
+
+- Regular and Duotone each completed Unity's 52 checks with zero failures. Normal
+  non-test firmware was restored after every run; the final restored weight is Regular.
+- Regular combined-load p95 was 34 ms baseline / 35 ms loaded; loaded frame maximum
+  34.263 ms. Alarm-load maxima across the three sounds were 48.040 / 47.885 / 48.050 ms.
+  Reported loaded capture maxima were at most 5.501 ms.
+- Duotone combined-load p95 was 35 / 35 ms; loaded frame maximum 35.334 ms.
+  Alarm-load maxima were 49.679 / 48.613 / 49.007 ms; reported loaded capture maxima
+  were at most 5.504 ms. This passes the 50 ms limit but leaves little alarm-load
+  headroom; future icon/rendering changes must be measured again.
+- Both runs reported zero audio underruns/write errors and passed the existing
+  overflow, stack, worker-delay, scratch-NVS and capture assertions. An earlier
+  Regular run failed the scratch-NVS capture limit at 25.092 ms; subsequent complete
+  Regular and Duotone runs passed without changing limits, erasing NVS, or resetting
+  clock settings. Treat these as observations, not a guarantee against future stalls.
+- Each primary weight passed 180 browser assertions with no browser errors and
+  deterministic native 320 x 240 captures. Thin/Light/Bold/Fill each smoke-rendered
+  17 real LVGL scenarios without browser errors; they were not device-timing tested.
+- Generator tests: 12 passed. Regular masks total 36,724 bytes; Duotone 68,068.
+  Production flash use was 2,283,009 / 2,314,697 bytes (Regular / Duotone), with the
+  same 175,012-byte static RAM report. Meteocons and generated Inter assets were unchanged.
 
 Manual sound-selection checks on normal firmware: hold on clock, short-press
 through minutes/hours/sound, rotate both ways, save by hold and by inactivity,
@@ -91,6 +124,15 @@ rotation still changes volume, not sound; field-change cues remain unchanged.
 Listen to each choice for continuous tails and adequate wake-up presence at the
 desired volume. The new loops retain approved audition levels, not the loudness
 of the old beep. Do not raise quiet test caps as a substitute for this check.
+
+The temperature-alignment / larger clock Wi-Fi follow-up passed 255 browser
+assertions and all 52 COM4 runtime checks. Visible temperature/artwork centers
+are within 1.5 px on both surfaces across day/night condition variants; the
+clock Wi-Fi asset is 22 px wide, with at least 18 px of visible coverage.
+Loaded frame p95 was 34 ms (baseline 34 ms), maximum 33.851 ms; the largest alarm
+frame was 48.462 ms and loaded capture maxima were at most 5.503 ms. Normal
+Regular firmware was restored successfully. These results supersede the earlier
+Regular layout/footprint observations, not the Duotone timing measurements.
 
 - `effects_tests.cpp`: absent backends, ringing/sunrise precedence, feedback
   rejection/non-replay, wrap-safe expiry, cancellation generations/stop
@@ -107,7 +149,7 @@ of the old beep. Do not raise quiet test caps as a substitute for this check.
   stop-without-disabling with the post-dismiss lockout, and the real audio worker
   (start, generation-matched ack, stop ack, underruns/errors, stack margin).
   The stop/snooze case also checks the simplified alarm overlay's exact glyph/text
-  inventory, arrow directions, theme colors, in-bounds nonoverlapping geometry, including
+  inventory (named Phosphor emblem, not a text label), arrow directions, theme colors, in-bounds nonoverlapping geometry, including
   midnight/noon/wide times, confirmation visibility, repeating pulse
   opacity bounds synchronized across the emblem/arrows, hint translation (0-6 px,
   snooze up and stop right, at most 2 px per frame, reset on confirmation), unchanged-snapshot

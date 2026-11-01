@@ -6,12 +6,6 @@
 /* Generated C fonts under src/ui/assets/fonts/ come from tools/fonts/fonts.json
  * (platformio run -t fonts). Never include those .c files; add LV_FONT_DECLARE() here. */
 
-LV_FONT_DECLARE(icons_72);
-LV_FONT_DECLARE(icons_14);
-LV_FONT_DECLARE(icons_36);
-LV_FONT_DECLARE(icons_alarm_72);
-LV_FONT_DECLARE(icons_alarm_48);
-LV_FONT_DECLARE(icons_18);
 LV_FONT_DECLARE(inter_96);
 LV_FONT_DECLARE(inter_48);
 LV_FONT_DECLARE(inter_28);
@@ -21,31 +15,6 @@ LV_FONT_DECLARE(inter_14);
 #define HG_FONT_STATUS  (&inter_14)
 #define HG_FONT_ALARM   (&inter_28)
 #define HG_FONT_ALARM_TIME (&inter_48)
-#define HG_FONT_WIFI_ICON  (&icons_72)
-#define HG_FONT_WIFI_ICON_SMALL  (&icons_14)
-#define HG_FONT_ALARM_ICON  (&icons_alarm_72)
-#define HG_FONT_ALARM_EMBLEM (&icons_alarm_48)
-#define HG_FONT_ACTION_ICON  (&icons_36)
-#define HG_FONT_VOLUME_ICON  (&icons_14)
-#define HG_ICON_VOLUME_LOW   "\uE04D"
-#define HG_ICON_VOLUME_HIGH  "\uE050"
-#define HG_FONT_SOUND_ICON  (&icons_14)
-#define HG_ICON_MUSIC_NOTE  "\uE405"
-
-/* Glyphs in icons_alarm_72 / icons_36 (Material Icons Outlined). */
-#define HG_ICON_ALARM      "\uE855"
-#define HG_ICON_SNOOZE     "\uE046"
-#define HG_ICON_ALARM_OFF  "\uE857"
-
-/* Weather page: big temperature (inter_48 has digits, '-', degree, minus) and chrome glyphs in
- * icons_18 (Material Icons Outlined). Condition art is full color, see hg/ui/icons.h. */
 #define HG_FONT_WEATHER_TEMP (&inter_48)
-#define HG_FONT_WEATHER_ICON (&icons_18)
-#define HG_ICON_LOCATION   "\uE0C8"
-#define HG_ICON_WIND       "\uEFD8"
-#define HG_ICON_PARTICLES  "\uE3EA"
-#define HG_ICON_HOME       "\uE88A"
-#define HG_ICON_DROP       "\uE798"
-#define HG_ICON_SUN        "\uE430"
 
 #endif

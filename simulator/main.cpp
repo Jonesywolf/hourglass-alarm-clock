@@ -11,6 +11,8 @@
 #include "hg/ui/boot_overlay.h"
 #include "hg/ui/navigator.h"
 #include "hg/ui/overlays.h"
+#include "hg/ui/theme.h"
+#include "hg/ui/ui_icon.h"
 
 #include <emscripten.h>
 #include <lvgl.h>
@@ -60,8 +62,8 @@ EMSCRIPTEN_KEEPALIVE void sim_cancel_inputs(void) { hg_sim_cancel_inputs(); }
 EMSCRIPTEN_KEEPALIVE void sim_time(int hour, int minute, int second, int valid) {
     hg_sim_set_time(hour, minute, second, valid);
 }
-EMSCRIPTEN_KEEPALIVE void sim_environment(int wifi, float lux) {
-    hg_sim_set_environment(wifi, lux);
+EMSCRIPTEN_KEEPALIVE void sim_environment(int wifi, float lux, int rssi) {
+    hg_sim_set_environment(wifi, lux, rssi);
 }
 EMSCRIPTEN_KEEPALIVE void sim_weather(int status, int condition, float temp, float feels,
                                      float high, float low, float wind, float gust, float uv,
@@ -88,6 +90,18 @@ EMSCRIPTEN_KEEPALIVE void sim_colors(void) {
         lv_obj_set_style_radius(patch, 0, 0);
         lv_obj_clear_flag(patch, LV_OBJ_FLAG_SCROLLABLE);
     }
+    hg_sim_render();
+}
+EMSCRIPTEN_KEEPALIVE void sim_icon_sample(int opacity, int night) {
+    lv_obj_t *root = lv_obj_create(lv_layer_top());
+    lv_obj_remove_style_all(root);
+    lv_obj_set_size(root, 320, 240);
+    lv_obj_set_style_bg_color(root, lv_color_black(), 0);
+    lv_obj_set_style_bg_opa(root, LV_OPA_COVER, 0);
+    hg_theme_set_nightlight(night != 0);
+    lv_obj_t *icon = hg_ui_icon_create(root, HG_UI_ICON_DROP, 18);
+    hg_ui_icon_set_color(icon, hg_theme_fg());
+    hg_ui_icon_set_opacity(icon, opacity);
     hg_sim_render();
 }
 EMSCRIPTEN_KEEPALIVE const char *sim_state(void) {
@@ -126,7 +140,8 @@ EMSCRIPTEN_KEEPALIVE const char *sim_state(void) {
         "\"store\":{\"pending\":%s,\"requested\":%u,\"saved\":%u,\"writes\":%u},"
         "\"input\":{\"encoderDown\":%s,\"touchDown\":%s,\"overflows\":%u,\"expired\":%u},"
         "\"time\":{\"hour\":%d,\"minute\":%d,\"second\":%d},"
-        "\"weather\":{\"offset\":%u,\"glanceLine\":%d,\"showWeather\":%s,\"indoorLevel\":%d}}",
+        "\"weather\":{\"offset\":%u,\"glanceLine\":%d,\"showWeather\":%s,\"indoorLevel\":%d},"
+        "\"uiIconWeight\":\"%s\",\"wifi\":{\"rssi\":%d,\"bars\":%d}}",
         now_ms, hg_sim_frames(), hg_navigator_current(), hg_navigator_is_sliding() ? "true" : "false",
         hg_boot_overlay_is_active() ? "true" : "false", hg_display_mode_get(), hg_sim_brightness(),
         alarm.enabled ? "true" : "false", alarm.ringing ? "true" : "false",
@@ -138,7 +153,8 @@ EMSCRIPTEN_KEEPALIVE const char *sim_state(void) {
         store.successful_saves, diag.encoder_pressed ? "true" : "false",
         diag.touch_pressed ? "true" : "false", diag.input_overflows, diag.expired_inputs,
         time.hour_24, time.minute, time.second, view.hourly_offset, glance.line,
-        glance.show_weather ? "true" : "false", sensors.indoor.level);
+        glance.show_weather ? "true" : "false", sensors.indoor.level,
+        HG_UI_ICON_WEIGHT, network.wifi.rssi, network.wifi.bars);
     return json;
 }
 }

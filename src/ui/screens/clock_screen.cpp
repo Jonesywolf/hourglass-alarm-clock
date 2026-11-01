@@ -5,6 +5,7 @@
 #include "hg/config.h"
 #include "hg/ui/fonts.h"
 #include "hg/ui/theme.h"
+#include "hg/ui/ui_icon.h"
 #include "hg/ui/weather_format.h"
 #include "hg/ui/weather_icons.h"
 
@@ -26,13 +27,13 @@ static const lv_coord_t clock_meridiem_gap = 4;
 static hg_wifi_bars_t displayed_wifi_bars = HG_WIFI_BARS_NONE;
 static hg_wifi_bars_t pending_wifi_bars = HG_WIFI_BARS_NONE;
 static uint8_t pending_wifi_samples = 0;
+static const uint16_t wifi_icon_size = 22;
 
-static const char *const wifi_icon_glyphs[] = {
-    "\uF0B0",  // 0 bars
-    "\uEBE4",  // 1 bar
-    "\uEBD6",  // 2 bars
-    "\uEBE1",  // 3 bars
-    "\uE1D8",  // 4 bars
+static const hg_ui_icon_id_t wifi_icons[] = {
+    HG_UI_ICON_WIFI_NONE,
+    HG_UI_ICON_WIFI_LOW,
+    HG_UI_ICON_WIFI_MEDIUM,
+    HG_UI_ICON_WIFI_HIGH,
 };
 
 static void render_alarm(void) {
@@ -47,9 +48,9 @@ static void render_alarm(void) {
         lv_obj_set_style_text_color(sound_label,
             !blink_visible && shown_edit.field == HG_ALARM_EDIT_SOUND ?
             hg_theme_bg() : hg_theme_alarm(), 0);
-        lv_obj_set_style_text_color(sound_icon,
+        hg_ui_icon_set_color(sound_icon,
             !blink_visible && shown_edit.field == HG_ALARM_EDIT_SOUND ?
-            hg_theme_bg() : hg_theme_alarm(), 0);
+            hg_theme_bg() : hg_theme_alarm());
         lv_obj_clear_flag(sound_label, LV_OBJ_FLAG_HIDDEN);
         lv_obj_clear_flag(sound_icon, LV_OBJ_FLAG_HIDDEN);
     } else {
@@ -116,6 +117,7 @@ static void render_glance(const hg_glance_snapshot_t *glance, hg_unit_system_t u
         char temp[16];
         hg_wx_format_temp(temp, sizeof(temp), glance->temp_c, units);
         lv_label_set_text(glance_temp, temp);
+        hg_wx_icon_align_temperature(glance_icon, glance_temp, 24);
         lv_obj_set_style_text_color(glance_temp,
                                     glance->muted ? hg_theme_muted() : hg_theme_fg(), 0);
         lv_obj_clear_flag(glance_icon, LV_OBJ_FLAG_HIDDEN);
@@ -144,8 +146,11 @@ static void blink_alarm(lv_timer_t *) {
 }
 
 static hg_wifi_bars_t hg_clock_clamp_wifi_bars(hg_wifi_bars_t bars) {
-    if (bars > HG_WIFI_BARS_4) {
-        return HG_WIFI_BARS_4;
+    if (bars > HG_WIFI_BARS_HIGH) {
+        return HG_WIFI_BARS_HIGH;
+    }
+    if (bars < HG_WIFI_BARS_NONE) {
+        return HG_WIFI_BARS_NONE;
     }
     return bars;
 }
@@ -162,7 +167,7 @@ static void hg_clock_set_wifi_icon(hg_wifi_bars_t bars, bool force) {
     }
 
     displayed_wifi_bars = clamped_bars;
-    lv_label_set_text(wifi_label, wifi_icon_glyphs[clamped_bars]);
+    hg_ui_icon_set(wifi_label, wifi_icons[clamped_bars], wifi_icon_size);
 }
 
 static void hg_clock_update_meridiem_position(bool is_pm) {
@@ -190,14 +195,12 @@ void hg_clock_screen_create(lv_obj_t *parent) {
     lv_obj_clear_flag(parent, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_set_style_bg_color(parent, hg_theme_bg(), 0);
 
-    wifi_label = lv_label_create(parent);
-    lv_obj_set_style_text_font(wifi_label, HG_FONT_WIFI_ICON_SMALL, 0);
-    lv_obj_set_style_text_color(wifi_label, hg_theme_fg(), 0);
+    wifi_label = hg_ui_icon_create(parent, HG_UI_ICON_WIFI_NONE, wifi_icon_size);
     displayed_wifi_bars = HG_WIFI_BARS_NONE;
     pending_wifi_bars = HG_WIFI_BARS_NONE;
     pending_wifi_samples = 0;
     hg_clock_set_wifi_icon(HG_WIFI_BARS_NONE, true);
-    lv_obj_align(wifi_label, LV_ALIGN_TOP_RIGHT, -10, 14);
+    lv_obj_align(wifi_label, LV_ALIGN_TOP_RIGHT, -8, 10);
 
     glance_rendered = false;
     glance_icon = lv_img_create(parent);
@@ -242,10 +245,8 @@ void hg_clock_screen_create(lv_obj_t *parent) {
     lv_label_set_text(sound_label, "");
     lv_obj_align(sound_label, LV_ALIGN_BOTTOM_LEFT, 30, -46);
     lv_obj_add_flag(sound_label, LV_OBJ_FLAG_HIDDEN);
-    sound_icon = lv_label_create(parent);
-    lv_obj_set_style_text_font(sound_icon, HG_FONT_SOUND_ICON, 0);
+    sound_icon = hg_ui_icon_create(parent, HG_UI_ICON_MUSIC_NOTE, 14);
     lv_obj_clear_flag(sound_icon, LV_OBJ_FLAG_CLICKABLE);
-    lv_label_set_text(sound_icon, HG_ICON_MUSIC_NOTE);
     lv_obj_align(sound_icon, LV_ALIGN_BOTTOM_LEFT, 10, -46);
     lv_obj_add_flag(sound_icon, LV_OBJ_FLAG_HIDDEN);
     shown_alarm = {};
@@ -309,7 +310,7 @@ void hg_clock_screen_update(const hg_clock_snapshot_t *snap) {
         lv_label_set_text(clock_label, "");
         lv_label_set_text(meridiem_label, "--");
         hg_clock_update_meridiem_position(false);
-        lv_obj_set_style_text_color(wifi_label, hg_theme_muted(), 0);
+        hg_ui_icon_set_color(wifi_label, hg_theme_muted());
         pending_wifi_bars = HG_WIFI_BARS_NONE;
         pending_wifi_samples = 0;
         hg_clock_set_wifi_icon(HG_WIFI_BARS_NONE, false);
@@ -327,10 +328,9 @@ void hg_clock_screen_update(const hg_clock_snapshot_t *snap) {
     lv_label_set_text(meridiem_label, is_pm ? "PM" : "AM");
     hg_clock_update_meridiem_position(is_pm);
 
-    lv_obj_set_style_text_color(
+    hg_ui_icon_set_color(
         wifi_label,
-        (snap->wifi.state == HG_WIFI_CONNECTED) ? hg_theme_fg() : hg_theme_muted(),
-        0);
+        (snap->wifi.state == HG_WIFI_CONNECTED) ? hg_theme_fg() : hg_theme_muted());
 
     if (snap->wifi.state != HG_WIFI_CONNECTED) {
         pending_wifi_bars = HG_WIFI_BARS_NONE;

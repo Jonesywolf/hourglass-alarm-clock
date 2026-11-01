@@ -16,7 +16,7 @@ Hour-glass alarm-clock firmware for ESP32-S3 + LVGL 8. Keep modules small so an 
 ```
 main → app → (ui | services | input_router)
                services → hal
-               ui → types, theme, fonts only
+               ui → types, theme, fonts, icons only
 ```
 
 - Public API lives only under `include/hg/`. Implementations live under `src/` with the same names.
@@ -35,10 +35,11 @@ main → app → (ui | services | input_router)
 - Domain logic: `include/hg/services/<name>.h` + `src/services/<name>.cpp`.
 - Pins that are not wired yet stay `-1` in `pins.h`.
 - Weather icon: add an entry to `tools/icons/icons.json`, run `platformio run -t icons`, and map it in `src/ui/weather_icons.cpp`. Screens never reference icon images directly. Glance/outlier rules live in `services/glance`; wording lives in `src/ui/weather_format.cpp`.
+- UI icon: register an official Phosphor name with `tools\icons\generate_ui_icons.py --add NAME --sizes SIZE ...`, then run `platformio run -t ui-icons`. Use `hg/ui/ui_icon.h` and generated `HG_UI_ICON_*` IDs, never codepoints or raw image descriptors. `tools/icons/ui_icons.json` selects one of six weights at generation/build time (Regular by default), including true Duotone. Keep Meteocons condition art separate and unchanged; see README "UI icons (Phosphor)".
 
 ## Edit one module
 
-Change `include/hg/<area>/<mod>.h` and `src/<area>/<mod>.cpp` only. Do not open generated font `.c` files under `src/ui/assets/fonts/` or generated image `.c` files under `src/ui/assets/icons/`. Do not open unrelated screens to change Wi-Fi, NTP, or hardware.
+Change `include/hg/<area>/<mod>.h` and `src/<area>/<mod>.cpp` only. Do not open generated font `.c` files under `src/ui/assets/fonts/` or generated image `.c` files under `src/ui/assets/icons/` and `src/ui/assets/ui_icons/`. Do not open unrelated screens to change Wi-Fi, NTP, or hardware.
 
 `src/app/input_router.cpp` is the only place that interprets touch/encoder. Rewrite it when UX changes; do not leak that policy into HAL or screens.
 

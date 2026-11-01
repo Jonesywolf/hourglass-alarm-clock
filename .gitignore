@@ -6,3 +6,4 @@ include/secrets.h
 *.otf
 simulator/build/
 .icons-cache/
+__pycache__/

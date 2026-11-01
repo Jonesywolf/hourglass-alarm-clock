@@ -19,9 +19,10 @@ get_filename_component(ROOT "${CMAKE_CURRENT_SOURCE_DIR}/.." ABSOLUTE)
 file(GLOB_RECURSE LVGL_SOURCES CONFIGURE_DEPENDS "${lvgl_SOURCE_DIR}/src/*.c")
 file(GLOB FONT_SOURCES CONFIGURE_DEPENDS "${ROOT}/src/ui/assets/fonts/*.c")
 file(GLOB ICON_SOURCES CONFIGURE_DEPENDS "${ROOT}/src/ui/assets/icons/*.c")
+file(GLOB UI_ICON_SOURCES CONFIGURE_DEPENDS "${ROOT}/src/ui/assets/ui_icons/*.c")
 
 add_executable(hourglass
-    ${LVGL_SOURCES} ${FONT_SOURCES} ${ICON_SOURCES}
+    ${LVGL_SOURCES} ${FONT_SOURCES} ${ICON_SOURCES} ${UI_ICON_SOURCES}
     "${ROOT}/src/diagnostics.cpp"
     "${ROOT}/src/app/app.cpp"
     "${ROOT}/src/app/input_router.cpp"
@@ -32,8 +33,10 @@ add_executable(hourglass
     "${ROOT}/src/services/effects.cpp"
     "${ROOT}/src/services/glance.cpp"
     "${ROOT}/src/services/sound.cpp"
+    "${ROOT}/src/services/wifi_signal.cpp"
     "${ROOT}/src/services/sound_alarm_clip.cpp"
     "${ROOT}/src/ui/theme.cpp"
+    "${ROOT}/src/ui/ui_icon.cpp"
     "${ROOT}/src/ui/navigator.cpp"
     "${ROOT}/src/ui/boot_overlay.cpp"
     "${ROOT}/src/ui/overlays.cpp"

@@ -15,6 +15,7 @@
 #include "hg/ui/overlays.h"
 #include "hg/ui/navigator.h"
 #include "hg/ui/theme.h"
+#include "hg/ui/ui_icon.h"
 
 static void run_app_ms(uint32_t duration_ms) {
     uint32_t started = millis();
@@ -98,13 +99,14 @@ static void check_ringing_overlay(const hg_alarm_snapshot_t &alarm) {
     lv_obj_t *root = hg_overlays_test_alarm_root();
     TEST_ASSERT_NOT_NULL(root);
     TEST_ASSERT_EQUAL(7, lv_obj_get_child_cnt(root));
-    const uint32_t label_indices[] = {0, 1, 2, 3, 5};
+    const uint32_t label_indices[] = {1, 2, 3, 5};
     for (uint32_t index : label_indices) {
         TEST_ASSERT_TRUE(lv_obj_check_type(lv_obj_get_child(root, index), &lv_label_class));
     }
     lv_obj_t *icon = lv_obj_get_child(root, 0);
-    TEST_ASSERT_EQUAL_STRING(HG_ICON_ALARM, lv_label_get_text(icon));
-    TEST_ASSERT_TRUE(lv_obj_get_style_text_font(icon, 0) == HG_FONT_ALARM_EMBLEM);
+    TEST_ASSERT_TRUE(lv_obj_check_type(icon, &hg_ui_icon_class));
+    TEST_ASSERT_EQUAL(HG_UI_ICON_ALARM, hg_ui_icon_get_asset(icon)->id);
+    TEST_ASSERT_EQUAL(48, hg_ui_icon_get_asset(icon)->size);
     TEST_ASSERT_EQUAL_STRING(alarm.hour >= 12 ? "pm" : "am",
                              lv_label_get_text(lv_obj_get_child(root, 1)));
     char expected[16];
@@ -130,7 +132,7 @@ static void check_ringing_overlay(const hg_alarm_snapshot_t &alarm) {
                                      points[1].x > points[0].x);
     }
     TEST_ASSERT_EQUAL_HEX32(lv_color_to32(hg_theme_alarm()),
-                          lv_color_to32(lv_obj_get_style_text_color(icon, 0)));
+                          lv_color_to32(hg_ui_icon_get_color(icon)));
     TEST_ASSERT_EQUAL_HEX32(lv_color_to32(hg_theme_fg()),
                           lv_color_to32(lv_obj_get_style_text_color(lv_obj_get_child(root, 2), 0)));
     for (uint32_t index : {3U, 5U}) {
@@ -150,12 +152,13 @@ static void check_confirm_overlay(const char *title, bool enabled) {
         TEST_ASSERT_TRUE(lv_obj_has_flag(lv_obj_get_child(root, i), LV_OBJ_FLAG_HIDDEN));
     }
     lv_obj_t *icon = lv_obj_get_child(root, 0);
-    TEST_ASSERT_TRUE(lv_obj_get_style_text_font(icon, 0) == HG_FONT_ALARM_ICON);
+    TEST_ASSERT_EQUAL(HG_UI_ICON_ALARM, hg_ui_icon_get_asset(icon)->id);
+    TEST_ASSERT_EQUAL(72, hg_ui_icon_get_asset(icon)->size);
     if (enabled) {
         TEST_ASSERT_TRUE(lv_obj_get_style_text_font(lv_obj_get_child(root, 2), 0) == HG_FONT_ALARM);
     }
     TEST_ASSERT_NULL(lv_anim_get(icon, NULL));
-    TEST_ASSERT_EQUAL(LV_OPA_COVER, lv_obj_get_style_text_opa(icon, 0));
+    TEST_ASSERT_EQUAL(LV_OPA_COVER, hg_ui_icon_get_opacity(icon));
     TEST_ASSERT_EQUAL(LV_OPA_COVER, lv_obj_get_style_line_opa(lv_obj_get_child(root, 4), 0));
     TEST_ASSERT_EQUAL(LV_OPA_COVER, lv_obj_get_style_line_opa(lv_obj_get_child(root, 6), 0));
     for (uint32_t i = 3; i < 7; ++i) {
@@ -179,7 +182,7 @@ static void check_alarm_pulse(const hg_alarm_snapshot_t &alarm) {
     uint32_t started = millis();
     while (millis() - started < 2300U) {
         hg_app_loop();
-        int opacity = lv_obj_get_style_text_opa(icon, 0);
+        int opacity = hg_ui_icon_get_opacity(icon);
         TEST_ASSERT_TRUE(opacity >= LV_OPA_60 && opacity <= LV_OPA_COVER);
         TEST_ASSERT_EQUAL(opacity, lv_obj_get_style_line_opa(lv_obj_get_child(root, 4), 0));
         TEST_ASSERT_EQUAL(opacity, lv_obj_get_style_line_opa(lv_obj_get_child(root, 6), 0));
@@ -204,7 +207,7 @@ static void check_alarm_pulse(const hg_alarm_snapshot_t &alarm) {
         hg_overlays_set_alarm(&alarm);
         TEST_ASSERT_TRUE(animation == lv_anim_get(icon, NULL));
         TEST_ASSERT_EQUAL(phase, animation->act_time);
-        TEST_ASSERT_EQUAL(opacity, lv_obj_get_style_text_opa(icon, 0));
+        TEST_ASSERT_EQUAL(opacity, hg_ui_icon_get_opacity(icon));
     }
     TEST_ASSERT_TRUE(minimum <= LV_OPA_60 + 8);
     TEST_ASSERT_TRUE(maximum >= LV_OPA_COVER - 8);

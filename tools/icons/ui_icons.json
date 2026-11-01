@@ -1,0 +1,234 @@
+{
+  "_comment": "Phosphor UI assets. Set weight, then run platformio run -t ui-icons. Register names with generate_ui_icons.py --add NAME --sizes SIZE ...",
+  "kind": "phosphor",
+  "weight": "regular",
+  "cache_dir": ".icons-cache/phosphor",
+  "output_dir": "src/ui/assets/ui_icons",
+  "header": "include/hg/ui/ui_icon_assets.h",
+  "renderer": {
+    "npm_package": "@resvg/resvg-js",
+    "version": "2.6.2"
+  },
+  "source": {
+    "revision": "2b75f3ad12b420c9504ef05df8d2564a28f8500e",
+    "url": "https://raw.githubusercontent.com/phosphor-icons/core/{revision}/assets/{weight}/{file}",
+    "license": "MIT"
+  },
+  "icons": [
+    {
+      "name": "alarm",
+      "sizes": [
+        48,
+        72
+      ],
+      "sha256": {
+        "thin": "8027d0b01db56c12917693f2faf5cf5e132fbaf2895b68a33466909b63ab412d",
+        "light": "dd9eb6043f15503dbac41c1018425e9e4699defb9ef4aa63a13354a57c898bec",
+        "regular": "71cf350cf81ef6e08377119c14d924f851191d9e828f9107a367d77fdd3f6cc9",
+        "bold": "f484e1978288e297696d8e3f8a8d917e0ea63d7769d577e56bb8c4293f036a0d",
+        "fill": "0e0c72041bea656827b8ea631bd7fb6787c302ba365d237a51e83bebe319bc3b",
+        "duotone": "ed36a5bc7f4f5a27785ebe7ff5cd8f9b09d582305c4081a077e763fcf5d1afd6"
+      }
+    },
+    {
+      "name": "dots-nine",
+      "sizes": [
+        18
+      ],
+      "sha256": {
+        "thin": "d29b128f84f3332cf350e8680bf0336751f13d13bdb649ed45b191e9abb7f299",
+        "light": "1f620228e6ff0c877ed851e2675bb7a360e357260d54cfccfb10b4fe10764494",
+        "regular": "710d1b545080691f08074143be11d82e3097d0e3056ea620748195744a469d22",
+        "bold": "930a06955cd2dd89bd96c7b99827b28ce6db02d6140297b80b22a9a3267f7cb7",
+        "fill": "6892e38d75f3dce54fb53604ef688f63417762c150ab9e8bcf4c18b76914011c",
+        "duotone": "75405f1e6e20ff70561886796b17fb8ddda521dffb777fe4d8a7592f04048c2f"
+      }
+    },
+    {
+      "name": "drop",
+      "sizes": [
+        18
+      ],
+      "sha256": {
+        "thin": "79a44ba9144035c72252483b48bb4566776e331210e1fd18362749c434919dfb",
+        "light": "2067c983a7d443fa33515189fe1b21bece9e5a4deb5035302db8e300d3db5a7b",
+        "regular": "2b5396d046ce74fc645c6064226dd4875cf5e98eb1c7372611bf069f1adbc5aa",
+        "bold": "23a7fb2e092cf171995dc4cc4da516a617c82f4e19aa6c4fc7aaa8235672720d",
+        "fill": "547974bcf9a14a058c7622a2412bdf25700bd83e610128829f96687e7f8499e6",
+        "duotone": "b263461c657b14c1c9c1e845e05e71d73afac85260c23bfe34b28901788b3286"
+      }
+    },
+    {
+      "name": "house",
+      "sizes": [
+        18
+      ],
+      "sha256": {
+        "thin": "04449d601cfa41dc75c6414f82cabca52dbf528d6376013d1c88e4ba4b7c11e5",
+        "light": "490d0a589e421622cdc0bbb511dc6fd6959fbee6c4b7b56229b05f95ae5444ac",
+        "regular": "180e9259e99e23da197b59b19394d006d6a5d33e384cc2b9c8381cb0214a5716",
+        "bold": "25f4b1504212c7c064054bd1d02ddaaf0a4e16ed49c6b08b23c3dc1f74e1d446",
+        "fill": "4783cdf0ae5f5ec363df6f77167a41642aac42fe8d73251b9a61232ab43f355d",
+        "duotone": "bd9f3502ab7d63c3cc8a3cf91657e5974188ede3bd1ac7249333d9ce5d0d932f"
+      }
+    },
+    {
+      "name": "map-pin",
+      "sizes": [
+        18
+      ],
+      "sha256": {
+        "thin": "bcd244ef7efbc6b9efccde3762f52ce5b20bca0ce73c691c1997a668810f1dc2",
+        "light": "7a257e8be5893a9b917ca1740c540d256356e78b2dd7894d1ad1a95b86ef6edf",
+        "regular": "523f024fa467fc285d95c1db4ed6c32b640513c79780d14310bebf342b6f94fb",
+        "bold": "07bb9883e9e324d0043309d8f7e41a1b2a8db80acb8371be8294edd9135f3b69",
+        "fill": "0480a057e6ae95fc2176e33564b1ea6d6b6e31e2398bd9e789f7097baf3315df",
+        "duotone": "c21ced095b724128b17c25ce60f40e32d98d14339038d818cf79140dc1e04349"
+      }
+    },
+    {
+      "name": "music-note",
+      "sizes": [
+        14
+      ],
+      "sha256": {
+        "thin": "bde299ba571c24ad1bd6ea6116eb84ea9d8d809821193cd8b840ba062e2ed763",
+        "light": "d3b3f44956c5a1cccf29af1a6eaecaa0adfeb87ac96e85aa6409f5694874b752",
+        "regular": "433d99d789fa7f1f43fe9e75e68eb3c546ef7ea7a4c6545c73f2f48f32f376fa",
+        "bold": "2656bbe1295fc097a6f029148c45660c45186d6ccf7453d5968216a1f2e31c55",
+        "fill": "389d6ef434ff1b488c9c67c882c41f701abd15fa07d46d4fa708cf28ab93850b",
+        "duotone": "912200834e238b0f1d3b40509624b29a8d0efab6cd5129fa83f7bbbb3fc645c9"
+      }
+    },
+    {
+      "name": "speaker-high",
+      "sizes": [
+        14
+      ],
+      "sha256": {
+        "thin": "d50b4ef2cd36bf9e9ee16c2bb271d375beb9324050dfee83668390f837851824",
+        "light": "fb4956e09f9e66e62e10949fe59c8163c28eb43644cfb6e945ca0628fcd41b5a",
+        "regular": "caca5fc1ee8489ac19232301d2c96f6d4048802491d75d761bbb89d5c98e459d",
+        "bold": "f0fc825cb96958238882b98aea55afdb63da92c4c5c8b499c0e1068e9abb299e",
+        "fill": "c266c407915382db3866570f816934b804c1b84bd47d971fad0e95ac5107dd6b",
+        "duotone": "df9b42e5af71a3f87a7588397ba9ad73f70133cbc1352e3f916ac8c2f380207b"
+      }
+    },
+    {
+      "name": "speaker-low",
+      "sizes": [
+        14
+      ],
+      "sha256": {
+        "thin": "0f9310f16d779c75496dfd1c16e1a5518e1279f3b8308f9dc0642810d8054140",
+        "light": "89361cf09e330c07817d67ead60524a97355a5ceb273a230309ce277a54dbdfb",
+        "regular": "e8f30ca16e03c397ead5c26416ab3064bdcef0d64762f9255e24e629a5eaa4f6",
+        "bold": "b60ada29bb53895a3055a266175316f6a102f99a10730afc61bff9acd5bff5eb",
+        "fill": "babd017b859a8efe860ec50fcddddd41e64969338402391d2a008475722c2a03",
+        "duotone": "a936dc1d3bdbe2e5271315d9374847a8870abf44f74bc0b6f1baca05ebd0a98e"
+      }
+    },
+    {
+      "name": "sun",
+      "sizes": [
+        18
+      ],
+      "sha256": {
+        "thin": "ebcba21c04cf77627075ae147da585db5c955907c6c207dbad6d52ea20b4871c",
+        "light": "bc3557822da55c4ebe6f80d68a0a7992b13060c0754a0ad7953d2321530777f6",
+        "regular": "8df1c7b747774f8b2c1fe353b1b785c74aac35bfa50f2ed7d8d9a85a4191b2ac",
+        "bold": "b1949871cab00cfea93d083ea5c3966b8f9618b5ac408767c6f9b3651805bf2d",
+        "fill": "343fb225b7f7dddd7b6b80e1cec533cf7839da96e0513c6da40e88dd24306154",
+        "duotone": "6a180204ea92f2501de811908395e6dad15ddf2ca0a577f420fad8bef0b4c5ca"
+      }
+    },
+    {
+      "name": "warning",
+      "sizes": [
+        72
+      ],
+      "sha256": {
+        "thin": "23d9292216852effd08537032d2ff230d7c13fb32db2c0ec993eae74ac1e7b84",
+        "light": "62ed0d3ff4272a0e975a617a2af99d3e93c6dc0e314c4cb2d82e0a5bae652598",
+        "regular": "047c8edbdfddb9f1692bbf56acc85b7e4649b567c60eb39470e98e4f9ddc6a2e",
+        "bold": "c473db9807bb726638eefcdc70554078cd2a195313d87e28a70498531ec106c0",
+        "fill": "90595f8a478ac1f156871ac8d8a35c7c4e372b8d101dad9aeb1bceadf9a2c7f0",
+        "duotone": "5ae0c2cd3e764e0e82f03685657353b65499d6b231745af8516c140e8b1ba4af"
+      }
+    },
+    {
+      "name": "wifi-high",
+      "sizes": [
+        22,
+        72
+      ],
+      "sha256": {
+        "thin": "d3b0e5dd1756022cc5a4527368dbfc904af9b878f3cce0720fd689f548715133",
+        "light": "37b46b4f7c7ee136227f66f6f48a2b80ffcc629fb8f9d86b3830840365be36a1",
+        "regular": "d11ce9b83f063b6d12d3c8ff93cce7d601fe19ee1d6e5ba828b4a764b100519f",
+        "bold": "e6b66437e340630aa1604592a6065583da7a27d1fe118e1cd7a6be4ad42ac694",
+        "fill": "d966516341d6e973e7dac9b0885cc905dcbf97f86290b0b6c65791d1206669e0",
+        "duotone": "8786219e51e953522cf0d170f13d70acac93fc795a9fabb711351ae4e71ae2c5"
+      }
+    },
+    {
+      "name": "wifi-low",
+      "sizes": [
+        22,
+        72
+      ],
+      "sha256": {
+        "thin": "cb3bcd3ceb7d863d5f4e33edff2d8331304814dd731c8ba295c15505253bae97",
+        "light": "d0423fac7fa8c284b2f2652487f42d1c7da8659d618f7bb959aac710063afafc",
+        "regular": "cfd46f02d3e508c728213f6fb36bbee4bc05a05ac862e7fe4b7a671cb0a5f99d",
+        "bold": "f389dcb59dc3265a6f3201382a6f6652451dfd3edd6c5f1626d6924cf14dc196",
+        "fill": "384579ace95e041a5f32f2204d45234e30f1ae70ec9ae29563bceb5067a818c7",
+        "duotone": "929d2eb769677c0facc65ae36eadcfd97ab2a91d5b785a79a85a066cd8d2c66e"
+      }
+    },
+    {
+      "name": "wifi-medium",
+      "sizes": [
+        22,
+        72
+      ],
+      "sha256": {
+        "thin": "d3aeedd644d4bcb2e3a46ca2fe7625dc292e09c031846b79197e21a517271921",
+        "light": "db40131191ee68ddd24aa05b823b7cb13946e671b22e5c0b5353d403a4845c81",
+        "regular": "ae92a3a813e5be912be60ade2be8d5a1b342bc676bfb75f6cf5dabc9fa24a9c7",
+        "bold": "ffd0bb7ea5ea6952db76d3367af396c75fb3da729d8975b32d01e259db05a808",
+        "fill": "f5dc711fe9e67bad9b4522b4be8ca8b6b3d9483fc8fa1d3129906498a6648993",
+        "duotone": "ee31fb511e36c3c837fed6fdac94671a779500da09354707065411d0861dd033"
+      }
+    },
+    {
+      "name": "wifi-none",
+      "sizes": [
+        22,
+        72
+      ],
+      "sha256": {
+        "thin": "4ae17d21caf95c7073b5d307a6abde6b6cf1bad6db3cb59a6de1cf8b973c2e84",
+        "light": "bef4e990f98a221f56fd1b6b9befd48fa97333174908541817fe362cea0369d9",
+        "regular": "78ba862e6be9e34f7760b42eb23eae3bc003db95fc38511b76b2aad59cec861d",
+        "bold": "47687c6b6147e7ae6000a35a73b73122d202bf8fc541f480d5b147e7d2fd8f83",
+        "fill": "0e5c3988fba423fbac136b4faab4aa62bee52e1753b0fcbd3003048bdddb5374",
+        "duotone": "0e5c3988fba423fbac136b4faab4aa62bee52e1753b0fcbd3003048bdddb5374"
+      }
+    },
+    {
+      "name": "wind",
+      "sizes": [
+        18
+      ],
+      "sha256": {
+        "thin": "d135eb102a46e949e050a4bff59de6f73d62e1c4b46f95ac3d10aa33d078c99e",
+        "light": "b19a003dff485631a1d13720366b399953111b6c320170d12d71da44aeb7fb2b",
+        "regular": "dd221a9698655fcd410a24cc0ccf0dc696c2adb4646b50bc81ac409654bc8401",
+        "bold": "8bd3ffd2f26688090752f4f1d685c0fdbe1927d76dcc80a2042bcb65f4c84a56",
+        "fill": "8846cc76adeb51cd26db6066b9a85b40ade9566903bccf9499d98d75604839ef",
+        "duotone": "b980894921d4062d3806f11fb10fd3672c9dc7367c39bdccc71e8f74908fd217"
+      }
+    }
+  ]
+}

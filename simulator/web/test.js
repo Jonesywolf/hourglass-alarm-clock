@@ -35,6 +35,45 @@ export async function runSimulationTests() {
     check(imageBytes().some((value, i) => i % 4 !== 3 && value > 0), "Canvas contains rendered UI pixels");
     check(document.getElementById("display").width === 320 &&
         document.getElementById("display").height === 240, "Capture is exactly 320x240");
+    const wifiPictures = new Set();
+    for (const [rssi, bars] of [[-86, 0], [-85, 1], [-75, 2], [-65, 3]]) {
+        await sim.reset({ environment: { rssi } });
+        sim.advance(2500);
+        check(sim.state().wifi.bars === bars, `RSSI ${rssi} maps to signal level ${bars}`);
+        wifiPictures.add(JSON.stringify(regionPixels(290, 10, 22, 22)));
+    }
+    check(wifiPictures.size === 4, "Four Wi-Fi levels have distinct Phosphor drawings");
+    const wifiPixels = regionPixels(290, 10, 22, 22);
+    const wifiColumns = [];
+    for (let x = 0; x < 22; ++x) {
+        if (Array.from({ length: 22 }, (_, y) => (y * 22 + x) * 3)
+            .some(i => Math.max(wifiPixels[i], wifiPixels[i + 1], wifiPixels[i + 2]) > 32)) {
+            wifiColumns.push(x);
+        }
+    }
+    check(wifiColumns.at(-1) - wifiColumns[0] + 1 >= 18,
+        "Clock Wi-Fi artwork is at least 18 visible pixels wide");
+    sim.setEnvironment({ wifi: 0 });
+    sim.advance(1000);
+    check(sim.state().wifi.bars === 0, "Disconnected Wi-Fi reports no signal");
+    await sim.scenario("clock");
+    sim.iconSample();
+    const normalIcon = regionPixels(0, 0, 18, 18);
+    check(normalIcon.some(value => value > 100), "Phosphor fixture has visible foreground");
+    const center = (10 * 18 + 9) * 3;
+    if (sim.state().uiIconWeight === "duotone") {
+        check(normalIcon[center] >= 41 && normalIcon[center] <= 57,
+            "True Duotone renders the fully covered interior at 20% opacity");
+    } else if (sim.state().uiIconWeight === "fill") {
+        check(normalIcon[center] > 200, "Fill drop interior is solid");
+    } else {
+        check(normalIcon[center] === 0, "Monochrome drop interior stays transparent");
+    }
+    await sim.scenario("clock");
+    sim.iconSample(153, true);
+    const nightIcon = regionPixels(0, 0, 18, 18);
+    check(nightIcon.some((value, i) => i % 3 === 0 && value > 0), "Night icon has visible red tint");
+    check(nightIcon.every((value, i) => i % 3 === 0 || value <= 32), "Both faded layers retain night tint");
 
     await sim.reset({ enabled: false });
     sim.input("encoder", 1);
@@ -281,6 +320,50 @@ export async function runSimulationTests() {
     check(!anyPixel(0, 0, 320, 240, notRed), "Nightlight weather page renders red only");
     await sim.scenario("weatherNoSensor");
     check(sim.state().weather.indoorLevel === 0, "Missing SEN66 reports unknown indoor air");
+
+    function verticalBounds(x, y, width, height) {
+        const data = imageBytes();
+        let top = Infinity, bottom = -Infinity;
+        for (let row = y; row < y + height; ++row) {
+            for (let col = x; col < x + width; ++col) {
+                const offset = (row * 320 + col) * 4;
+                if (Math.max(data[offset], data[offset + 1], data[offset + 2]) > 32) {
+                    top = Math.min(top, row);
+                    bottom = Math.max(bottom, row);
+                }
+            }
+        }
+        return { top, bottom, center: (top + bottom) / 2 };
+    }
+    for (const night of [false, true]) {
+        for (let sky = 1; sky <= 12; ++sky) {
+            await sim.reset({
+                environment: { sky, outdoor: sky % 2 ? -8 : 18, lux: night ? 1 : 100 },
+                time: { hour: night ? 23 : 10 },
+            });
+            const smallArt = verticalBounds(6, 0, 40, 44);
+            const smallTemp = verticalBounds(50, 0, 140, 44);
+            check(Math.abs(smallArt.center - smallTemp.center) <= 1.5,
+                `Clock artwork/temperature are visually centered: sky ${sky}, night ${night}`);
+            sim.press(40, "touch");
+            sim.advance(320);
+            const largeArt = verticalBounds(6, 24, 80, 80);
+            const largeTemp = verticalBounds(94, 24, 140, 54);
+            check(Math.abs(largeArt.center - largeTemp.center) <= 1.5,
+                `Weather artwork/temperature are visually centered: sky ${sky}, night ${night}`);
+            check(largeTemp.bottom < 78, "Centered temperature stays clear of the condition subtitle");
+        }
+    }
+    await sim.scenario("weatherRain");
+    const weatherHeader = regionPixels(6, 0, 80, 22);
+    await sim.scenario("weather");
+    check(samePixels(weatherHeader, regionPixels(6, 0, 80, 22)),
+        "Opaque artwork padding does not cover the location header");
+    await sim.scenario("fetching");
+    const placeholderArt = verticalBounds(6, 24, 80, 80);
+    const placeholderTemp = verticalBounds(94, 24, 140, 54);
+    check(Math.abs(placeholderArt.center - placeholderTemp.center) <= 1.5,
+        "Fetching placeholder and unknown artwork are visually centered");
 
     for (const name of sim.scenarios) {
         await sim.scenario(name);

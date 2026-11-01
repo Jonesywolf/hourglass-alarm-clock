@@ -2,6 +2,7 @@
 
 #include "hg/ui/icons.h"
 #include "hg/ui/theme.h"
+#include "hg/log.h"
 
 typedef struct {
     const lv_img_dsc_t *color;
@@ -61,4 +62,72 @@ void hg_wx_icon_apply(lv_obj_t *img, hg_weather_condition_t condition, bool is_d
         lv_obj_set_style_img_recolor_opa(img, LV_OPA_TRANSP, 0);
         lv_obj_set_style_img_opa(img, muted ? LV_OPA_50 : LV_OPA_COVER, 0);
     }
+}
+
+void hg_wx_icon_align_temperature(lv_obj_t *img, lv_obj_t *temperature, lv_coord_t center_y) {
+    struct bounds_t {
+        bool ready;
+        lv_coord_t top;
+        lv_coord_t bottom;
+    };
+    static bounds_t art_bounds[HG_WX_COUNT][2][2] = {};
+    const void *source = lv_img_get_src(img);
+    bounds_t *bounds = nullptr;
+    for (unsigned condition = 0; condition < HG_WX_COUNT && !bounds; ++condition) {
+        for (unsigned night = 0; night < 2 && !bounds; ++night) {
+            for (unsigned size = 0; size < 2; ++size) {
+                const icon_pair_t &pair = night ? icons[condition].night[size] :
+                                                  icons[condition].day[size];
+                if (source != pair.color && source != pair.mono) {
+                    continue;
+                }
+                bounds = &art_bounds[condition][night][size];
+                if (!bounds->ready) {
+                    bounds->top = pair.mono->header.h;
+                    bounds->bottom = -1;
+                    for (unsigned y = 0; y < pair.mono->header.h; ++y) {
+                        for (unsigned x = 0; x < pair.mono->header.w; ++x) {
+                            // Exclude nearly transparent antialiasing fringes.
+                            if (pair.mono->data[y * pair.mono->header.w + x] > 32) {
+                                bounds->top = LV_MIN(bounds->top, static_cast<lv_coord_t>(y));
+                                bounds->bottom = y;
+                                break;
+                            }
+                        }
+                    }
+                    bounds->ready = true;
+                }
+                break;
+            }
+        }
+    }
+    if (!bounds || bounds->bottom < bounds->top) {
+        HG_ERROR("weather-ui", "Cannot align temperature: missing weather artwork bounds\n");
+        return;
+    }
+    const lv_font_t *font = lv_obj_get_style_text_font(temperature, LV_PART_MAIN);
+    const char *text = lv_label_get_text(temperature);
+    lv_coord_t top = font->line_height;
+    lv_coord_t bottom = -1;
+    uint32_t offset = 0;
+    while (text[offset]) {
+        uint32_t character = _lv_txt_encoded_next(text, &offset);
+        lv_font_glyph_dsc_t glyph;
+        if (!lv_font_get_glyph_dsc(font, &glyph, character, 0)) {
+            HG_ERROR("weather-ui", "Cannot align temperature: missing glyph %lu\n",
+                     static_cast<unsigned long>(character));
+            return;
+        }
+        if (glyph.box_h) {
+            lv_coord_t glyph_top = font->line_height - font->base_line - glyph.box_h - glyph.ofs_y;
+            top = LV_MIN(top, glyph_top);
+            bottom = LV_MAX(bottom, glyph_top + glyph.box_h - 1);
+        }
+    }
+    if (bottom < top) {
+        HG_ERROR("weather-ui", "Cannot align an empty temperature\n");
+        return;
+    }
+    lv_obj_set_y(img, center_y - (bounds->top + bounds->bottom + 1) / 2);
+    lv_obj_set_y(temperature, center_y - (top + bottom + 1) / 2);
 }

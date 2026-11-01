@@ -10,6 +10,7 @@
 #include "hg/services/store.h"
 #include "hg/services/time.h"
 #include "hg/services/wifi.h"
+#include "hg/services/wifi_signal.h"
 
 #include <emscripten.h>
 #include <math.h>
@@ -74,10 +75,10 @@ static bool sample_valid(int status) {
     return status != HG_SAMPLE_WAITING && status != HG_SAMPLE_UNAVAILABLE;
 }
 
-void hg_sim_set_environment(int wifi, float lux) {
+void hg_sim_set_environment(int wifi, float lux, int rssi) {
     sensors.light = {true, lux, hg_sim_now(), HG_SAMPLE_READY};
-    network.wifi = {(hg_wifi_state_t)wifi, wifi == HG_WIFI_CONNECTED ? -55 : 0,
-                    wifi == HG_WIFI_CONNECTED ? HG_WIFI_BARS_4 : HG_WIFI_BARS_NONE};
+    network.wifi = {(hg_wifi_state_t)wifi, wifi == HG_WIFI_CONNECTED ? rssi : 0,
+                    wifi == HG_WIFI_CONNECTED ? hg_wifi_bars_from_rssi(rssi) : HG_WIFI_BARS_NONE};
     network.ready = true;
 }
 

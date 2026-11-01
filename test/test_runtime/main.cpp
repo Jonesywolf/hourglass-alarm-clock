@@ -57,6 +57,8 @@ void test_volume_animation_under_load(void);
 void test_alarm_choice_record_and_saves(void);
 void test_alarm_choice_pcm_and_scaling(void);
 void test_alarm_sound_editor_and_presentation(void);
+void test_wifi_signal_boundaries(void);
+void test_ui_icon_assets_and_layers(void);
 
 void setUp(void) {}
 void tearDown(void) {
@@ -72,6 +74,7 @@ void setup(void) {
     delay(1500);
     hg_log_init();
     UNITY_BEGIN();
+    RUN_TEST(test_wifi_signal_boundaries);
     RUN_TEST(test_effect_defaults_and_unavailable);
     RUN_TEST(test_alarm_preempts_feedback_without_replay);
     RUN_TEST(test_feedback_expiry_and_stop_generation);
@@ -82,6 +85,7 @@ void setup(void) {
     RUN_TEST(test_timing_percentiles);
     RUN_TEST(test_worker_creation_failure_cleanup);
     RUN_TEST(test_app_startup);
+    RUN_TEST(test_ui_icon_assets_and_layers);
     RUN_TEST(test_input_queue_and_overlay_generation);
     RUN_TEST(test_stale_samples_and_pause_generation);
     RUN_TEST(test_save_coalescing_and_acknowledgement);

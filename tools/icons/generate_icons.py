@@ -214,6 +214,10 @@ def write_if_changed(target, data):
 
 
 def main():
+    if "--ui" in sys.argv:
+        from generate_ui_icons import main as generate_ui
+        generate_ui([arg for arg in sys.argv[1:] if arg != "--ui"])
+        return
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--manifest", type=Path, default=DEFAULT_MANIFEST)
     parser.add_argument("--force", action="store_true", help="re-download sources and reinstall tools")

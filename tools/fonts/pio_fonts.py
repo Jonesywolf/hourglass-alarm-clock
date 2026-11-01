@@ -1,7 +1,7 @@
 Import("env")
 
 # `platformio run -t fonts` regenerates every font in tools/fonts/fonts.json.
-# Limit it with HG_FONTS, e.g. PowerShell: $env:HG_FONTS = "icons_36,inter_96".
+# Limit it with HG_FONTS, e.g. PowerShell: $env:HG_FONTS = "inter_28,inter_96".
 env.AddCustomTarget(
     name="fonts",
     dependencies=None,

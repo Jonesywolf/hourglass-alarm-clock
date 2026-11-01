@@ -11,7 +11,7 @@ bool hg_sim_input(int kind, int32_t value);
 void hg_sim_cancel_inputs(void);
 void hg_sim_capture_state(void);
 void hg_sim_set_time(int hour, int minute, int second, bool valid);
-void hg_sim_set_environment(int wifi, float lux);
+void hg_sim_set_environment(int wifi, float lux, int rssi);
 /* Synthetic forecast: hourly temps follow low..high (peak 3pm). Wet conditions rain for the next
  * 4 hours; dry ones with rain_pct >= the rain threshold get rain starting 3 hours from now. */
 typedef struct {

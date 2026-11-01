@@ -81,10 +81,9 @@ typedef enum {
 
 typedef enum {
     HG_WIFI_BARS_NONE = 0,
-    HG_WIFI_BARS_1,
-    HG_WIFI_BARS_2,
-    HG_WIFI_BARS_3,
-    HG_WIFI_BARS_4
+    HG_WIFI_BARS_LOW,
+    HG_WIFI_BARS_MEDIUM,
+    HG_WIFI_BARS_HIGH
 } hg_wifi_bars_t;
 
 typedef struct {
