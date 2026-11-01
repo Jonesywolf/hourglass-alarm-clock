@@ -35,7 +35,7 @@ main → app → (ui | services | input_router)
 - Domain logic: `include/hg/services/<name>.h` + `src/services/<name>.cpp`.
 - Pins that are not wired yet stay `-1` in `pins.h`.
 - Weather icon: add an entry to `tools/icons/icons.json`, run `platformio run -t icons`, and map it in `src/ui/weather_icons.cpp`. Screens never reference icon images directly. Glance/outlier rules live in `services/glance`; wording lives in `src/ui/weather_format.cpp`.
-- UI icon: register an official Phosphor name with `tools\icons\generate_ui_icons.py --add NAME --sizes SIZE ...`, then run `platformio run -t ui-icons`. Use `hg/ui/ui_icon.h` and generated `HG_UI_ICON_*` IDs, never codepoints or raw image descriptors. `tools/icons/ui_icons.json` selects one of six weights at generation/build time (Regular by default), including true Duotone. Keep Meteocons condition art separate and unchanged; see README "UI icons (Phosphor)".
+- UI icon: register an official Phosphor name with `tools\icons\generate_ui_icons.py --add NAME --sizes SIZE ...`, then run `platformio run -t ui-icons`. Use `hg/ui/ui_icon.h` and generated `HG_UI_ICON_*` IDs, never codepoints or raw image descriptors. `tools/icons/ui_icons.json` selects one of six weights at generation/build time (Bold currently selected), including true Duotone. Keep Meteocons condition art separate and unchanged; see README "UI icons (Phosphor)".
 
 ## Edit one module
 

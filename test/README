@@ -88,7 +88,7 @@ has been verified by it.
   pinned hashes, all six weight outputs, alpha coverage and true Duotone splitting.
   UI weight is generation/build-time only; generate with `platformio run -t ui-icons`.
   Run the browser suite and inspect native captures in Regular and Duotone. Restore
-  the manifest-selected Regular assets before the final production build/upload.
+  the manifest-selected assets before the final production build/upload.
 - `ui_icon_tests.cpp`: production RSSI boundaries at -85/-75/-65 dBm, named alpha
   asset coverage, root sizes, identity changes, tint, foreground/shade opacity
   relationships, and the official no-shade Duotone case. Existing editor, volume

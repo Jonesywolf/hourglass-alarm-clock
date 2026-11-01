@@ -1,7 +1,7 @@
 {
   "_comment": "Phosphor UI assets. Set weight, then run platformio run -t ui-icons. Register names with generate_ui_icons.py --add NAME --sizes SIZE ...",
   "kind": "phosphor",
-  "weight": "regular",
+  "weight": "bold",
   "cache_dir": ".icons-cache/phosphor",
   "output_dir": "src/ui/assets/ui_icons",
   "header": "include/hg/ui/ui_icon_assets.h",

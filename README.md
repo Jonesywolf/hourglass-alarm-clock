@@ -386,7 +386,7 @@ illustrations remain Meteocons; the drawn alarm direction arrows are unchanged.
 [`tools/icons/ui_icons.json`](tools/icons/ui_icons.json) is the source of truth for
 official names, sizes, the pinned upstream commit and each weight's SHA-256.
 
-Set its `weight` to `thin`, `light`, `regular` (default), `bold`, `fill`, or
+Set its `weight` to `thin`, `light`, `regular`, `bold` (currently selected), `fill`, or
 `duotone`, then regenerate and rebuild. This is **generation/build-time only**:
 the clock has no style setting, and only the selected weight is compiled.
 
@@ -432,7 +432,7 @@ image. True Duotone draws an aligned shade at the upstream 20% opacity below the
 foreground, retaining both theme tint and fade behavior. Some official Duotone
 symbols, such as `wifi-none`, intentionally have no shaded layer.
 
-The current Regular set contains 37,876 mask bytes before descriptors. Duotone adds
+The current Bold set contains 37,876 mask bytes before descriptors. Duotone adds
 shade masks and a second alpha draw where present; measure device timing rather
 than treating browser checks as proof. Build and visually validate both targets
 after changes, including night mode and alarm pulse phases.
