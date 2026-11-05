@@ -52,7 +52,9 @@ void hg_wx_icon_apply(lv_obj_t *img, hg_weather_condition_t condition, bool is_d
     unsigned index = (unsigned)condition < HG_WX_COUNT ? (unsigned)condition : 0U;
     unsigned slot = size == HG_WX_ICON_LARGE ? 1U : 0U;
     const icon_pair_t *pair = is_day ? &icons[index].day[slot] : &icons[index].night[slot];
-    if (hg_theme_nightlight()) {
+    /* Muted (stale/placeholder) art uses the mono glyph in the muted text tone: half-opacity colour
+     * art falls below WCAG 1.4.11's 3:1 on black. */
+    if (hg_theme_nightlight() || muted) {
         set_src(img, pair->mono);
         lv_obj_set_style_img_recolor(img, muted ? hg_theme_muted() : hg_theme_fg(), 0);
         lv_obj_set_style_img_recolor_opa(img, LV_OPA_COVER, 0);
@@ -60,7 +62,7 @@ void hg_wx_icon_apply(lv_obj_t *img, hg_weather_condition_t condition, bool is_d
     } else {
         set_src(img, pair->color);
         lv_obj_set_style_img_recolor_opa(img, LV_OPA_TRANSP, 0);
-        lv_obj_set_style_img_opa(img, muted ? LV_OPA_50 : LV_OPA_COVER, 0);
+        lv_obj_set_style_img_opa(img, LV_OPA_COVER, 0);
     }
 }
 

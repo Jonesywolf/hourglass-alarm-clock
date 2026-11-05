@@ -139,15 +139,19 @@ def convert(rgba, background):
 
     Color images are pre-blended onto the theme background: LVGL then draws them as plain
     TRUE_COLOR copies instead of splitting color/alpha and mask-blending every frame."""
-    swapped, mono = bytearray(), bytearray()
+    swapped, mono = bytearray(), []
     for i in range(0, len(rgba), 4):
         r, g, b, a = rgba[i], rgba[i + 1], rgba[i + 2], rgba[i + 3]
         blended = [(c * a + bg * (255 - a) + 127) // 255 for c, bg in zip((r, g, b), background)]
         color = to_rgb565(*blended)
         swapped += bytes((color >> 8, color & 0xFF))
         luminance = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255.0
-        mono.append(round(a * (MONO_FLOOR + (1.0 - MONO_FLOOR) * luminance)))
-    return swapped, mono
+        mono.append(a * (MONO_FLOOR + (1.0 - MONO_FLOOR) * luminance))
+    # Normalize so the brightest shade is fully opaque: dark-only artwork (e.g. not-available)
+    # would otherwise render well below the theme tint and fail WCAG 1.4.11 contrast.
+    peak = max(mono, default=0)
+    scale = 255.0 / peak if peak else 0.0
+    return swapped, bytearray(min(255, round(v * scale)) for v in mono)
 
 
 def unpremultiply(rgba):

@@ -134,10 +134,12 @@ cannot make the network snapshot stale.
   the SEN66 Good/Fair/Poor from the worst of CO2, PM2.5 and VOC index (thresholds in
   `config.h`). The face only mentions indoor air when it is Poor; the weather page
   always shows the level and indoor temperature, or `Indoor --` without a sensor.
-- **Weather page:** hero icon, temperature, condition, feels-like and high/low,
+- **Weather page:** hero condition icon, temperature, feels-like and high/low,
   today's rain chance and UV, then a 5-column hourly strip over 24 hours. Encoder
   rotation scrolls the strip; leaving the page resets it. The bottom chips show
-  wind (with gust range), color-coded outdoor AQI, and indoor air.
+  wind (with gust range), color-coded outdoor AQI, and indoor air. Location, update
+  time and redundant condition names are omitted; exceptional status still shows
+  `Out of date`, `Fetching weather...` or `Weather unavailable`.
 
 ## Alarm and audio
 

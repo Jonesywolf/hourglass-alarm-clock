@@ -63,7 +63,54 @@ function update() {
     document.getElementById("diagnostics").textContent = JSON.stringify(snapshot, null, 2);
     document.getElementById("status").textContent =
         `Ready | ${playing ? "Playing" : "Paused"} | virtual ${snapshot.now} ms | ${snapshot.frames} rendered frames`;
+    if (contrastVisible) showContrast();
     return snapshot;
+}
+let contrastModule;
+let contrastVisible = false;
+async function loadContrast() {
+    contrastModule ||= await import("./contrast.js");
+    return contrastModule;
+}
+function contrastTargets() {
+    return JSON.parse(call("sim_contrast_targets", "string"));
+}
+function themeTokens(night) {
+    return JSON.parse(call("sim_theme_tokens", "string", ["number"], [night ? 1 : 0]));
+}
+// Audits the currently rendered frame; results carry WCAG ratios for every visible text/graphic.
+async function contrastCheck() {
+    const { audit } = await loadContrast();
+    return audit(framebuffer, contrastTargets());
+}
+function showContrast() {
+    const overlay = document.getElementById("contrast-overlay");
+    if (!contrastVisible || !contrastModule) {
+        overlay.getContext("2d").clearRect(0, 0, overlay.width, overlay.height);
+        return;
+    }
+    const results = contrastModule.audit(framebuffer, contrastTargets());
+    contrastModule.drawOverlay(overlay, results, overlay.width / 320);
+    const failing = results.filter((r) => !r.pass);
+    document.getElementById("contrast-report").textContent = failing.length ?
+        failing.map((r) => `${r.kind} "${r.text}" ${r.ratio}:1 < ${r.required}:1 (${r.fg} on ${r.bg})`).join("\n") :
+        `All ${results.length} visible text/graphics meet WCAG 2.2 AA.`;
+}
+// Scenarios that are not UI states for contrast: diagnostic colour patches and backlight off.
+const contrastSkip = new Set(["colors", "off"]);
+async function contrastAudit({ scenarios: names = Object.keys(scenarios).filter((n) => !contrastSkip.has(n)),
+    settleMs = 0 } = {}) {
+    await loadContrast();
+    const results = [];
+    for (const name of names) {
+        await scenario(name);
+        if (settleMs) advance(settleMs);
+        for (const result of await contrastCheck()) results.push({ scenario: name, ...result });
+    }
+    const tokens = [...contrastModule.tokenChecks(themeTokens(false), "day"),
+        ...contrastModule.tokenChecks(themeTokens(true), "night")];
+    return { results, failures: results.filter((r) => !r.pass), tokens,
+        tokenFailures: tokens.filter((t) => !t.pass) };
 }
 function advance(ms) {
     number(ms, 0, 3600000, "Advance duration");
@@ -261,7 +308,7 @@ function iconSample(opacity = 255, night = false) {
 }
 window.hgPreview = {
     reset, scenario, advance, input, press, cancelInputs, state, setTime, setEnvironment, capture,
-    iconSample,
+    iconSample, contrastCheck, contrastAudit, themeTokens,
     play: () => setPlaying(true), pause: () => setPlaying(false),
     scenarios: Object.keys(scenarios),
 };
@@ -308,10 +355,21 @@ handle("capture", () => {
     link.href = capture();
     link.click();
 });
+document.getElementById("contrast").addEventListener("change", async (event) => {
+    try {
+        contrastVisible = event.target.checked;
+        await loadContrast();
+        await window.hgPreview.ready;
+        document.getElementById("contrast-report").textContent = "";
+        showContrast();
+    } catch (error) { showError(error); }
+});
 document.getElementById("scale").addEventListener("change", (event) => {
     const scale = Number(event.target.value);
-    canvas.style.width = `${320 * scale}px`;
-    canvas.style.height = `${240 * scale}px`;
+    for (const element of [canvas, document.getElementById("contrast-overlay")]) {
+        element.style.width = `${320 * scale}px`;
+        element.style.height = `${240 * scale}px`;
+    }
 });
 window.addEventListener("blur", () => {
     if (!moduleInstance || loading) return;

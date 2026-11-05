@@ -44,7 +44,7 @@ add_executable(hourglass
     "${ROOT}/src/ui/weather_icons.cpp"
     "${ROOT}/src/ui/screens/clock_screen.cpp"
     "${ROOT}/src/ui/screens/weather_screen.cpp"
-    main.cpp display.cpp runtime.cpp environment.cpp
+    main.cpp display.cpp runtime.cpp environment.cpp contrast.cpp
 )
 target_include_directories(hourglass PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/compat" "${ROOT}/include" "${lvgl_SOURCE_DIR}")
@@ -60,3 +60,4 @@ set_target_properties(hourglass PROPERTIES SUFFIX ".js")
 configure_file(web/index.html index.html COPYONLY)
 configure_file(web/preview.js preview.js COPYONLY)
 configure_file(web/test.js test.js COPYONLY)
+configure_file(web/contrast.js contrast.js COPYONLY)

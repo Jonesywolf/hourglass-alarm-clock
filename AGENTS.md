@@ -82,6 +82,10 @@ Secrets stay in gitignored `include/secrets.h`. Copy `include/secrets.example.h`
   `await window.hgPreview.ready; const { runSimulationTests } = await import("/test.js"); await runSimulationTests();`.
   Also inspect the changed states visually (including night mode and relevant
   animation phases); report assertions and visible/browser errors accurately.
+- The suite enforces WCAG 2.2 AA contrast (4.5:1 small text, 3:1 large text/icons)
+  in day and nightlight modes. Fix colours via `hg_theme_*` tokens rather than adding
+  exemptions; never use `hg_theme_dim` or reduced opacity for text. See the
+  [contrast audit](simulator/README.md#contrast-audit-wcag-22-aa).
 - Peripherals/time/network are synthetic, settings are memory-only, and audio/
   LEDs are unavailable. Browser checks do not prove ESP32 frame/capture timing,
   DMA, worker concurrency, NVS durability or physical input. Continue to build

@@ -29,12 +29,9 @@ typedef struct {
     uint32_t icon_color;
 } chip_t;
 
-static lv_obj_t *location_icon;
-static lv_obj_t *location_label;
-static lv_obj_t *updated_label;
 static lv_obj_t *hero_icon;
 static lv_obj_t *temp_label;
-static lv_obj_t *condition_label;
+static lv_obj_t *status_label;
 static lv_obj_t *detail_label;
 static lv_obj_t *rain_icon;
 static lv_obj_t *rain_label;
@@ -113,29 +110,19 @@ void hg_weather_screen_create(lv_obj_t *parent) {
     lv_obj_clear_flag(parent, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_set_style_bg_color(parent, hg_theme_bg(), 0);
 
-    // Centering can move the opaque asset's black padding behind the header.
     hero_icon = lv_img_create(parent);
-    lv_obj_set_pos(hero_icon, 6, 24);
-
-    location_icon = hg_ui_icon_create(parent, HG_UI_ICON_MAP_PIN, 18);
-    lv_obj_set_pos(location_icon, 6, 4);
-    location_label = make_label(parent, HG_FONT_STATUS);
-    lv_label_set_long_mode(location_label, LV_LABEL_LONG_DOT);
-    lv_obj_set_width(location_label, 140);
-    lv_obj_set_pos(location_label, 26, 5);
-    updated_label = make_label(parent, HG_FONT_STATUS);
-    lv_obj_align(updated_label, LV_ALIGN_TOP_RIGHT, -8, 5);
+    lv_obj_set_pos(hero_icon, 6, 12);
 
     temp_label = make_label(parent, HG_FONT_WEATHER_TEMP);
-    lv_obj_set_pos(temp_label, 94, 20);
-    condition_label = make_label(parent, HG_FONT_STATUS);
-    lv_label_set_long_mode(condition_label, LV_LABEL_LONG_DOT);
-    lv_obj_set_width(condition_label, 220);
-    lv_obj_set_pos(condition_label, 96, 78);
+    lv_obj_set_pos(temp_label, 94, 8);
     detail_label = make_label(parent, HG_FONT_STATUS);
     lv_label_set_long_mode(detail_label, LV_LABEL_LONG_DOT);
     lv_obj_set_width(detail_label, 220);
-    lv_obj_set_pos(detail_label, 96, 96);
+    lv_obj_set_pos(detail_label, 96, 78);
+    status_label = make_label(parent, HG_FONT_STATUS);
+    lv_label_set_long_mode(status_label, LV_LABEL_LONG_DOT);
+    lv_obj_set_width(status_label, 220);
+    lv_obj_set_pos(status_label, 96, 96);
 
     rain_icon = hg_ui_icon_create(parent, HG_UI_ICON_DROP, 18);
     lv_obj_set_pos(rain_icon, 236, 30);
@@ -187,38 +174,20 @@ void hg_weather_screen_create(lv_obj_t *parent) {
     make_chip(row, &indoor_chip, HG_UI_ICON_HOUSE);
 }
 
-static void render_header(const hg_weather_snapshot_t *weather) {
-    hg_ui_icon_set_color(location_icon, hg_theme_muted());
-    lv_obj_set_style_text_color(location_label, hg_theme_muted(), 0);
-    lv_obj_set_style_text_color(updated_label, hg_theme_muted(), 0);
-    lv_label_set_text(location_label, weather->location[0] ? weather->location : "Locating\xE2\x80\xA6");
-    char updated[40] = "";
-    if (weather->valid && weather->updated_minute_of_day >= 0) {
-        char clock[12];
-        int minutes = weather->updated_minute_of_day;
-        int hour12 = (minutes / 60) % 12;
-        snprintf(clock, sizeof(clock), "%d:%02d%s", hour12 ? hour12 : 12, minutes % 60,
-                 minutes >= 12 * 60 ? "pm" : "am");
-        snprintf(updated, sizeof(updated), "%s %s",
-                 weather->status == HG_SAMPLE_STALE ? "Out of date," : "Updated", clock);
-    }
-    lv_label_set_text(updated_label, updated);
-    lv_obj_align(updated_label, LV_ALIGN_TOP_RIGHT, -8, 5);
-}
-
 static void render_hero(const hg_weather_snapshot_t *weather, hg_unit_system_t units) {
     bool muted = weather->status == HG_SAMPLE_STALE;
     lv_color_t fg = muted ? hg_theme_muted() : hg_theme_fg();
     char text[64], a[16], b[16], c[16];
     lv_obj_set_style_text_color(temp_label, fg, 0);
-    lv_obj_set_style_text_color(condition_label, fg, 0);
+    lv_obj_set_style_text_color(status_label, hg_theme_muted(), 0);
     lv_obj_set_style_text_color(detail_label, hg_theme_muted(), 0);
     if (!weather->valid) {
         hg_wx_icon_apply(hero_icon, HG_WX_UNKNOWN, true, HG_WX_ICON_LARGE, true);
         lv_label_set_text(temp_label, "--\xC2\xB0");
-        hg_wx_icon_align_temperature(hero_icon, temp_label, 56);
-        lv_label_set_text(condition_label, weather->status == HG_SAMPLE_ERROR ?
+        hg_wx_icon_align_temperature(hero_icon, temp_label, 44);
+        lv_label_set_text(status_label, weather->status == HG_SAMPLE_ERROR ?
                           "Weather unavailable" : "Fetching weather\xE2\x80\xA6");
+        set_visible(status_label, true);
         lv_label_set_text(detail_label, weather->location[0] ? "Will retry shortly" :
                           "Waiting for Wi-Fi and location");
         set_visible(rain_icon, false);
@@ -230,8 +199,9 @@ static void render_hero(const hg_weather_snapshot_t *weather, hg_unit_system_t u
     hg_wx_icon_apply(hero_icon, weather->condition, weather->is_day, HG_WX_ICON_LARGE, muted);
     hg_wx_format_temp(text, sizeof(text), weather->temp_c, units);
     lv_label_set_text(temp_label, text);
-    hg_wx_icon_align_temperature(hero_icon, temp_label, 56);
-    lv_label_set_text(condition_label, hg_wx_condition_name(weather->condition));
+    hg_wx_icon_align_temperature(hero_icon, temp_label, 44);
+    lv_label_set_text(status_label, muted ? "Out of date" : "");
+    set_visible(status_label, muted);
     hg_wx_format_temp(a, sizeof(a), weather->feels_like_c, units);
     hg_wx_format_temp(b, sizeof(b), weather->high_c, units);
     hg_wx_format_temp(c, sizeof(c), weather->low_c, units);
@@ -360,7 +330,6 @@ void hg_weather_screen_update(const hg_weather_page_snapshot_t *snap) {
     bool view_changed = weather_changed ||
                         memcmp(&snap->view, &shown_view, sizeof(shown_view)) != 0;
     if (weather_changed) {
-        render_header(&snap->weather);
         render_hero(&snap->weather, snap->units);
     }
     if (view_changed) {

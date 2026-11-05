@@ -12,6 +12,7 @@ const files = new Map([
     ["/index.html", ["index.html", "text/html"]],
     ["/preview.js", ["preview.js", "text/javascript"]],
     ["/test.js", ["test.js", "text/javascript"]],
+    ["/contrast.js", ["contrast.js", "text/javascript"]],
     ["/hourglass.js", ["hourglass.js", "text/javascript"]],
     ["/hourglass.wasm", ["hourglass.wasm", "application/wasm"]],
 ]);

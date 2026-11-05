@@ -72,8 +72,9 @@ export async function runSimulationTests() {
     await sim.scenario("clock");
     sim.iconSample(153, true);
     const nightIcon = regionPixels(0, 0, 18, 18);
-    check(nightIcon.some((value, i) => i % 3 === 0 && value > 0), "Night icon has visible red tint");
-    check(nightIcon.every((value, i) => i % 3 === 0 || value <= 32), "Both faded layers retain night tint");
+    check(nightIcon.some((value, i) => i % 3 === 0 && value > 0), "Night icon has visible warm tint");
+    check(nightIcon.every((value, i, p) => i % 3 !== 0 ||
+        (p[i + 1] <= p[i] * 0.5 + 8 && p[i + 2] <= p[i] * 0.15 + 8)), "Both faded layers retain night tint");
 
     await sim.reset({ enabled: false });
     sim.input("encoder", 1);
@@ -233,7 +234,7 @@ export async function runSimulationTests() {
     await sim.scenario("night");
     check(sim.state().displayMode === 1, "Dark lux activates night theme");
     check(imageBytes().some((value, i, data) => i % 4 === 0 && value > 40 &&
-        data[i + 1] < 10 && data[i + 2] < 10), "Night theme has correctly ordered red RGB565 pixels");
+        data[i + 1] < value * 0.5 && data[i + 2] < 16), "Night theme has correctly ordered warm RGB565 pixels");
     await sim.scenario("off");
     check(sim.state().displayMode === 2 && sim.state().brightness === 0, "Dark display turns off at one hour");
     check(!imageBytes().some((value, i) => i % 4 !== 3 && value !== 0), "Backlight-off canvas is black");
@@ -257,7 +258,8 @@ export async function runSimulationTests() {
         return false;
     }
     const sunny = (r, g, b) => r > 200 && g > 140 && b < 90;
-    const notRed = (r, g, b) => g > r * 0.25 + 8 || b > r * 0.25 + 8;
+    // Nightlight is warm red/amber: no blue, green well below red.
+    const notRed = (r, g, b) => g > r * 0.5 + 8 || b > r * 0.15 + 8;
     await sim.scenario("clock");
     check(sim.state().weather.showWeather && sim.state().weather.glanceLine === LINE.none,
         "Calm weather shows the chip with no context line");
@@ -347,21 +349,27 @@ export async function runSimulationTests() {
                 `Clock artwork/temperature are visually centered: sky ${sky}, night ${night}`);
             sim.press(40, "touch");
             sim.advance(320);
-            const largeArt = verticalBounds(6, 24, 80, 80);
-            const largeTemp = verticalBounds(94, 24, 140, 54);
+            const largeArt = verticalBounds(6, 4, 80, 100);
+            const largeTemp = verticalBounds(94, 4, 140, 74);
             check(Math.abs(largeArt.center - largeTemp.center) <= 1.5,
                 `Weather artwork/temperature are visually centered: sky ${sky}, night ${night}`);
-            check(largeTemp.bottom < 78, "Centered temperature stays clear of the condition subtitle");
+            check(largeTemp.bottom < 78, "Centered temperature stays clear of the feels-like detail");
+            check(!anyPixel(96, 96, 220, 18, (r, g, b) => Math.max(r, g, b) > 32),
+                "Fresh weather has no redundant condition or status line");
         }
     }
-    await sim.scenario("weatherRain");
-    const weatherHeader = regionPixels(6, 0, 80, 22);
-    await sim.scenario("weather");
-    check(samePixels(weatherHeader, regionPixels(6, 0, 80, 22)),
-        "Opaque artwork padding does not cover the location header");
+    for (const name of ["stale", "fetching", "unavailable"]) {
+        await sim.scenario(name);
+        check(anyPixel(96, 96, 220, 18, (r, g, b) => Math.max(r, g, b) > 32),
+            `${name} weather retains an explicit status message`);
+    }
+    sim.setEnvironment({ status: 1 });
+    sim.advance(1000);
+    check(!anyPixel(96, 96, 220, 18, (r, g, b) => Math.max(r, g, b) > 32),
+        "Recovered weather clears the exceptional status message");
     await sim.scenario("fetching");
-    const placeholderArt = verticalBounds(6, 24, 80, 80);
-    const placeholderTemp = verticalBounds(94, 24, 140, 54);
+    const placeholderArt = verticalBounds(6, 4, 80, 100);
+    const placeholderTemp = verticalBounds(94, 4, 140, 74);
     check(Math.abs(placeholderArt.center - placeholderTemp.center) <= 1.5,
         "Fetching placeholder and unknown artwork are visually centered");
 
@@ -372,6 +380,22 @@ export async function runSimulationTests() {
     }
     check(!sim.state().effects.audioAvailable && !sim.state().effects.ledAvailable,
         "Unavailable physical outputs are not reported active");
+
+    const contrast = await sim.contrastAudit();
+    for (const token of contrast.tokens) {
+        check(token.pass, `WCAG AA ${token.mode} ${token.name} ${token.color} ` +
+            `${token.ratio}:1 >= ${token.required}:1`);
+    }
+    check(contrast.results.length > 300, "Contrast audit covers visible text and graphics");
+    const night = contrast.results.filter((r) => ["night", "weatherNightlight", "glanceNight"]
+        .includes(r.scenario));
+    check(night.length > 0 && night.every((r) => r.pass), "Nightlight scenarios meet WCAG 2.2 AA");
+    const slide = contrast.results.filter((r) => r.scenario === "slide");
+    check(slide.some((r) => r.clipped), "Contrast audit covers the mid-slide frame and its clipped edges");
+    const offenders = contrast.failures.map((r) => `${r.scenario}: ${r.kind} "${r.text}" ` +
+        `${r.ratio}:1 < ${r.required}:1 (${r.fg} on ${r.bg})`);
+    check(!offenders.length, `Every scenario meets WCAG 2.2 AA contrast${offenders.length ?
+        `\n${offenders.join("\n")}` : ""}`);
     await sim.scenario("clock");
     return { passed: results.length, assertions: results };
 }

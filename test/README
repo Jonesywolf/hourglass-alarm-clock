@@ -134,6 +134,21 @@ frame was 48.462 ms and loaded capture maxima were at most 5.503 ms. Normal
 Regular firmware was restored successfully. These results supersede the earlier
 Regular layout/footprint observations, not the Duotone timing measurements.
 
+The Bold / simplified weather-page follow-up passed 282 browser assertions and
+all 52 runtime checks on ESP32-S3 / COM4, with zero failures or ignored cases.
+Native day/night, fresh, stale, fetching and unavailable captures were visually
+checked; normal conditions use the icon only, with exceptional status retained.
+Baseline / loaded frame p95 was 33 / 33 ms (96 samples each), with maxima
+32.433 / 32.500 ms. Alarm-load maxima across the three sounds were
+46.370 / 45.481 / 46.900 ms; the largest loaded capture gap was 5.532 ms.
+Worker delays reached 257.130 ms sensor / 272.155 ms network. Free stack margins
+were 1,076 bytes input, 2,456 sensor, 3,596 network and at least 2,368 audio.
+All load checks passed overflow and zero audio-underrun/write-error assertions.
+Four real scratch-NVS saves and probe removal passed; the longest write was
+22.060 ms, with capture / frame maxima 5.475 / 32.394 ms.
+The suite and restoration both exited 0; normal Bold firmware with the simplified
+weather page was uploaded successfully afterward.
+
 - `effects_tests.cpp`: absent backends, ringing/sunrise precedence, feedback
   rejection/non-replay, wrap-safe expiry, cancellation generations/stop
   acknowledgement, opt-in AQI policy, timing histogram behavior, and semantic

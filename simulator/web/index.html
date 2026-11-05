@@ -9,6 +9,8 @@
     body { margin: 24px; background: #17191d; color: #eee; font: 15px system-ui; }
     main { display: flex; flex-wrap: wrap; gap: 24px; }
     canvas { width: 640px; height: 480px; image-rendering: pixelated; background: black; }
+    .screen { position: relative; width: fit-content; }
+    #contrast-overlay { position: absolute; inset: 0; background: transparent; pointer-events: none; }
     button, select, input { font: inherit; padding: 6px; margin: 4px; }
     button { cursor: pointer; }
     fieldset { margin-bottom: 12px; max-width: 600px; }
@@ -26,11 +28,16 @@
   <p id="status" role="status">Loading WebAssembly...</p>
   <main>
     <section>
-      <canvas id="display" width="320" height="240" aria-label="320 by 240 LVGL display"></canvas>
+      <div class="screen">
+        <canvas id="display" width="320" height="240" aria-label="320 by 240 LVGL display"></canvas>
+        <canvas id="contrast-overlay" width="960" height="720" aria-hidden="true"></canvas>
+      </div>
       <p>
         <label>Scale <select id="scale"><option>1</option><option selected>2</option><option>3</option></select></label>
         <button id="capture">Download 320x240 PNG</button>
+        <label><input id="contrast" type="checkbox">Show WCAG contrast failures</label>
       </p>
+      <pre id="contrast-report" aria-live="polite"></pre>
       <div id="errors" role="alert"></div>
     </section>
     <section>

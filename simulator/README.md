@@ -171,7 +171,7 @@ control (snooze up, stop right) in single-pixel steps, rests, and returns after 
 render after snooze and stop.
 Weather checks cover every glance line and its priority, the briefing window
 (stop only, not snooze), Poor indoor rating, hourly scroll clamping/reset, units,
-full-color icons in normal mode and red-only pixels in nightlight.
+full-color icons in normal mode and warm (no-blue) pixels in nightlight.
 Phosphor checks cover four distinct signal drawings, RSSI boundaries/disconnection,
 transparent monochrome interiors, Duotone's 20% shade, and tinted faded layers.
 Temperature alignment checks compare visible pixel bounds (within 1.5 px) against
@@ -180,6 +180,42 @@ temperatures. They also cover the fetching placeholder, subtitle clearance and
 location-header visibility.
 Clock Wi-Fi coverage must span at least 18 visible pixels within its 22 px asset.
 Failures throw with state diagnostics. The suite leaves a fresh clock preview.
+
+## Contrast audit (WCAG 2.2 AA)
+
+The suite fails if any visible text or meaningful graphic in any scenario is below
+WCAG 2.2 AA on its rendered background:
+
+| Element | Minimum |
+|---|---|
+| Text under 24 px (Inter 14) | 4.5:1 (SC 1.4.3) |
+| Large text (Inter 28/48/96) | 3:1 |
+| Icons, weather art, guidance arrows | 3:1 (SC 1.4.11) |
+
+`sim_contrast_targets()` (browser-only, `simulator/contrast.cpp`) lists every visible,
+unoccluded LVGL label, icon, image and line with its declared colour and effective
+opacity. `web/contrast.js` takes the background as the dominant framebuffer colour in
+each box. Text is judged by its declared colour blended at that opacity. Graphics also
+need their brightest rendered pixel to pass, which catches alpha-shaded masks.
+The suite also checks theme tokens (`fg`, `alarm`, `muted`, rain and AQI colours) in day
+and nightlight modes. Decorative tracks/dividers (`hg_theme_dim`) are not text and are
+not audited. Only `colors` (diagnostic patches) and `off` (backlight off) are skipped;
+the mid-transition `slide` frame is audited. Elements cut off by the screen or a parent
+are judged on their visible slice; a cut-off slice that draws no ink is not reported.
+
+Run it on its own:
+
+```javascript
+await window.hgPreview.ready;
+const report = await window.hgPreview.contrastAudit();   // { results, failures, tokens, tokenFailures }
+await window.hgPreview.contrastCheck();                   // current frame only
+```
+
+Tick **Show WCAG contrast failures** in the page to outline failing elements in red
+(with their ratio) and list them under the display. Yellow outlines are warnings where
+the declared colour passes but rendered pixels do not, such as unexpected occlusion.
+Nightlight is a warm red/amber ramp without blue, so hierarchy uses hue as well as
+brightness and every text tone still passes 4.5:1. Never use `hg_theme_dim` for text.
 
 ## What this does not prove
 
