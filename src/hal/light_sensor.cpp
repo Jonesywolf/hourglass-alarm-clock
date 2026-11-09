@@ -4,10 +4,22 @@
 #include <Arduino.h>
 #include <Wire.h>
 
+#ifdef HG_RUNTIME_TEST
+#include <atomic>
+#endif
+
 #define HG_TSL_AVALID 0x01U
 
 static Adafruit_TSL2591 sensor(2591);
 static bool sensor_ready = false;
+
+#ifdef HG_RUNTIME_TEST
+static std::atomic<bool> forced_error(false);
+
+void hg_light_sensor_test_force_error(bool enabled) {
+    forced_error.store(enabled);
+}
+#endif
 
 static bool hg_tsl_read8(uint8_t reg, uint8_t *out) {
     Wire.beginTransmission(TSL2591_ADDR);
@@ -57,6 +69,11 @@ hg_sample_status_t hg_light_sensor_read_lux(float *lux) {
         return HG_SAMPLE_ERROR;
     }
 
+#ifdef HG_RUNTIME_TEST
+    if (forced_error.load()) {
+        return HG_SAMPLE_ERROR;
+    }
+#endif
     if (!sensor_ready) {
         return HG_SAMPLE_ERROR;
     }

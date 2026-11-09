@@ -322,6 +322,36 @@ export async function runSimulationTests() {
     check(!anyPixel(0, 0, 320, 240, notRed), "Nightlight weather page renders red only");
     await sim.scenario("weatherNoSensor");
     check(sim.state().weather.indoorLevel === 0, "Missing SEN66 reports unknown indoor air");
+    for (const [name, text] of [
+        ["weatherNoSensor", "Indoor --"], ["indoorWaiting", "Indoor wait"],
+        ["indoorStale", "Indoor stale"], ["indoorPaused", "Indoor pause"],
+        ["indoorError", "Indoor error"], ["indoorWaitingNightlight", "Indoor wait"],
+        ["indoorErrorNightlight", "Indoor error"],
+    ]) {
+        await sim.scenario(name);
+        check(sim.state().weather.indoorText === text, `${name} shows the indoor status`);
+        check(sim.state().weather.chipsFit, `${name} indoor chip does not overlap or clip`);
+    }
+    await sim.scenario("indoorPartialPoor");
+    check(sim.state().weather.indoorLevel === 3, "A partial Poor reading is reported immediately");
+    check(sim.state().weather.indoorText.startsWith("Poor"), "Partial Poor appears on the weather page");
+    sim.setEnvironment({ co2: 0, pm25: null, voc: 0 });
+    sim.advance(1000);
+    check(sim.state().weather.indoorLevel === 0 &&
+        sim.state().weather.indoorText === "Indoor wait", "Missing rating channels show waiting");
+    sim.setEnvironment({ co2: 800, pm25: 4, voc: 100 });
+    sim.advance(1000);
+    check(sim.state().weather.indoorLevel === 1 &&
+        sim.state().weather.indoorText.startsWith("Good"), "Recovered channels restore the normal chip");
+    await sim.reset({ environment: { co2: 1800, pm25: null, voc: 0 } });
+    check(sim.state().weather.glanceLine === LINE.indoor, "Partial Poor triggers the clock alert");
+    sim.setEnvironment({ co2: 1800, pm25: null, voc: 0, indoorStatus: 5 });
+    sim.advance(1000);
+    check(sim.state().weather.glanceLine !== LINE.indoor, "A failed sensor does not alert from old data");
+    await sim.reset({ environment: { wind: 120, gust: 190, aqi: 500, indoorStatus: 3, units: 1 } });
+    sim.press(40, "touch");
+    sim.advance(320);
+    check(sim.state().weather.chipsFit, "Indoor status fits beside long wind and AQI chips");
 
     function verticalBounds(x, y, width, height) {
         const data = imageBytes();

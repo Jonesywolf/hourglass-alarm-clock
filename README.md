@@ -93,8 +93,8 @@ HAL is still an unavailable stub. Feedback requests do not pretend an output is 
   stop/restart, warm-up, thermal cooldown, and fresh-data rules need actual driver
   support. No thermal-control guarantee is made by this policy.
 
-Sunrise scheduling, ramp duration, animation content, and actual
-LED/SEN66 integration are not implemented here. Future sunrise
+Sunrise scheduling, ramp duration, animation content, and physical
+LED/SEN66 thermal integration are not implemented here. Future sunrise
 progress should use elapsed monotonic time, not UI frame counts. Use hardware RMT
 for SK6812 output; do not bit-bang LEDs. Recheck shared internal-memory, peripheral,
 and CPU budgets, and merge any LED worker's applied state into the same
@@ -132,14 +132,48 @@ cannot make the network snapshot stale.
   Calm, normal days show no line.
 - **Indoor air:** there is no standard indoor AQI. `services/air_rating` rates
   the SEN66 Good/Fair/Poor from the worst of CO2, PM2.5 and VOC index (thresholds in
-  `config.h`). The face only mentions indoor air when it is Poor; the weather page
-  always shows the level and indoor temperature, or `Indoor --` without a sensor.
+  `config.h`). A known Poor channel is reported immediately; Good or Fair requires
+  all three channels. The face only mentions fresh indoor air when it is Poor.
+  The weather page shows the level and indoor temperature when ready, or a short
+  waiting, unavailable, stale, paused, or error state instead of an old reading.
 - **Weather page:** hero condition icon, temperature, feels-like and high/low,
   today's rain chance and UV, then a 5-column hourly strip over 24 hours. Encoder
   rotation scrolls the strip; leaving the page resets it. The bottom chips show
   wind (with gust range), color-coded outdoor AQI, and indoor air. Location, update
   time and redundant condition names are omitted; exceptional status still shows
   `Out of date`, `Fetching weather...` or `Weather unavailable`.
+
+### SEN66 sensor
+
+The SEN66 shares the sensor worker's I2C bus with the TSL2591: SDA is GPIO 4
+and SCL is GPIO 5. Their 7-bit I2C addresses are `0x6B` and `0x29`, respectively.
+The clock uses an Adafruit SEN6x adapter on its 3.3 V rail.
+The adapter accepts 3.3 V or 5 V input and regulates/level-shifts for the sensor;
+the bare SEN66 itself requires 3.3 V +/-5%. Sensirion warns of sensor current
+peaks up to 350 mA. Verify the ESP32 supply's capacity and the voltage at the
+sensor under load, and ensure the separate display supply shares signal ground.
+The display's separate USB-C supply reduces its load on the ESP32 rail but does
+not establish that the remaining supply has enough headroom.
+
+The sensor worker starts continuous measurement without resetting calibration
+or changing automatic-calibration settings. I2C commands and responses are
+scheduled separately; failures and latched device-status faults are reported
+and retried without blocking the UI or stopping light measurements. A sensor
+fault flag can remain latched until the underlying issue is corrected and the
+sensor is restarted; the firmware does not silently clear it.
+`Start measurement failed (0x0000010c)` means the SEN66 did not acknowledge its
+I2C address. Power down before checking adapter power, shared ground, and the
+SDA/SCL connections; also verify the supply under load before relying on readings.
+
+The first frame takes about 1.1 seconds. CO2 may be unavailable for 5-6 seconds
+after power-on or reset, and NOx for 10-11 seconds. Missing float channels are
+NaN and missing CO2/VOC/NOx values are zero in the snapshot; warm-up is not an
+acquisition error. The snapshot contains temperature, humidity, PM1, PM2.5,
+PM4, PM10, CO2, VOC index, and NOx index. Only the existing indoor level and
+temperature are shown on the weather page. A failed or paused acquisition
+retains the last good sample and its timestamp but does not present it as fresh.
+Ventilation, enclosure heat, and the sensor's existing calibration can affect
+measurements; the indoor rating is a heuristic, not a standardized AQI.
 
 ## Alarm and audio
 

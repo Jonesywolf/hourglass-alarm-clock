@@ -171,6 +171,7 @@ function setEnvironment(options = {}) {
     }
     const values = { ...environmentDefaults, airStatus: options.status ?? environmentDefaults.status, ...options };
     for (const [key, [min, max, integer, label]] of Object.entries(environmentSpec)) {
+        if (key === "pm25" && values[key] === null) continue;
         number(values[key], min, max, label, integer);
     }
     if (started && values.units !== environment.units) {
@@ -182,10 +183,10 @@ function setEnvironment(options = {}) {
         values.feels, values.high, values.low, values.wind, values.gust, values.uv, values.rain,
         values.aqi, values.airStatus]);
     call("sim_indoor", null, Array(6).fill("number"), [values.indoorStatus, values.indoor,
-        values.humidity, values.co2, values.pm25, values.voc]);
+        values.humidity, values.co2, values.pm25 === null ? NaN : values.pm25, values.voc]);
     if (!started) call("sim_units", null, ["number"], [values.units]);
     for (const key of Object.keys(environmentSpec)) {
-        document.getElementById(key).value = values[key];
+        document.getElementById(key).value = values[key] === null ? "" : values[key];
     }
 }function cancelInputs() {
     call("sim_cancel_inputs", null);
@@ -249,6 +250,13 @@ const scenarios = {
     weatherImperial: weatherAt({ units: 1, sky: 1, outdoor: 31, feels: 34, high: 33, low: 20, uv: 9 }),
     weatherNightlight: weatherAt({ lux: 1, sky: 6, rain: 80 }, { hour: 23, minute: 15 }),
     weatherNoSensor: weatherAt({ indoorStatus: 4 }),
+    indoorWaiting: weatherAt({ co2: 0 }),
+    indoorStale: weatherAt({ indoorStatus: 2 }),
+    indoorPaused: weatherAt({ indoorStatus: 3 }),
+    indoorError: weatherAt({ indoorStatus: 5 }),
+    indoorPartialPoor: weatherAt({ co2: 1800, pm25: null, voc: 0 }),
+    indoorWaitingNightlight: weatherAt({ lux: 1, co2: 0 }, { hour: 23, minute: 15 }),
+    indoorErrorNightlight: weatherAt({ lux: 1, indoorStatus: 5 }, { hour: 23, minute: 15 }),
     fetching: weatherAt({ status: 0, airStatus: 0 }),
     unavailable: weatherAt({ status: 4 }),
     stale: weatherAt({ status: 2 }),

@@ -59,6 +59,27 @@ the test and restoration exit codes separately so a successful restore does not
 hide a failed test. If interrupted, explicitly check what firmware remains on the
 board. Do not leave the synthetic-load test image installed.
 
+For the optional live SEN66 checks, with both SEN66 and TSL2591 connected and
+the same upload permission, run the separate suite and again restore production
+firmware in `finally`:
+
+```powershell
+& $pio test -e runtime-test -f test_sen66_live --upload-port COM4 --test-port COM4 -v
+$testExit = $LASTEXITCODE
+```
+
+This suite waits for all nine real SEN66 channels and two fresh frames, checks
+the light sensor, and exercises pause/resume plus injected SEN66 and light-read
+failures independently. The injected-failure logs are expected; both sensors must
+recover. It does not require unplugging a powered sensor, recalibrating it, or
+modifying real alarm settings. The general runtime suite does not require a SEN66.
+Record actual values/statuses and any missing channels, and do not claim that a
+software test establishes supply capacity or sensor calibration accuracy.
+An address-NACK (`Start measurement failed (0x0000010c)`) means the SEN66 is
+not responding at `0x6B`; power down before checking power, ground and shared
+SDA/SCL wiring. The suite also requires the TSL2591 to return a valid light
+sample; a responding device at `0x29` alone is not sufficient.
+
 Without permission/hardware, build production and build tests without uploading:
 
 ```powershell
@@ -70,6 +91,10 @@ has been verified by it.
 
 ## What runs
 
+- `sen66_tests.cpp`: deterministic SEN66 command timing, scaling, warm-up
+  sentinels, CRC/short-read failures, retries, clock rollover, pause/resume,
+  retained snapshots, and partial-channel rating boundaries. Injected SEN66
+  failure logs in these named tests are expected.
 - `alarm_choice_tests.cpp`: all three approved PCM identities (sample hashes and
   96,000-frame lengths), mapping, loop/chunk equivalence and scaled caps at
   5/75/100%, v2 sound decoding, legacy defaults, malformed records/sound IDs,
@@ -258,7 +283,8 @@ This is hardware regression evidence, not a new automated Unity case.
 Require the expected number of executed cases, **zero failures**, successful
 restoration, and actual timing samples. A reset/panic, watchdog message, silent
 serial timeout, ignored suite, or missing metrics is not a pass.
-The current suite contains 47 cases.
+The current `test_runtime` suite contains 58 cases; `test_sen66_live` adds four
+separate hardware-specific cases.
 
 1. **FRAME** reports complete rendered-frame gaps during slides, not average
    idle-loop time. Both baseline and loaded series must have more than 24 samples,
@@ -322,7 +348,8 @@ subjective visual confirmation and from still-unimplemented LED/AQI features.
 
 Future RMT/LED integration must add checks for transmission errors, memory/peripheral
 headroom, real device timing, and combined output load (the audio checks above are
-the model). The test suite does not yet drive an SK6812 or SEN66.
+the model). The opt-in SEN66 suite exercises real sensor acquisition; no suite
+drives an SK6812 or verifies physical LED/SEN66 thermal interaction.
 
 ## Manual editor and nighttime checks
 
@@ -367,6 +394,19 @@ After the automated suite restores normal firmware:
   adjustments must be recorded separately from automated passes.
 
 ## Reference measurements
+
+The SEN66 integration passed all four live sensor checks and all 58 runtime
+cases on the authorized ESP32-S3/COM4, with normal firmware restored after
+each suite. The live checks obtained all nine channels and two fresh frames,
+and verified pause/resume and independent SEN66/TSL2591 failure recovery.
+With the SEN66 active, baseline/loaded slide tests each recorded 96 frames
+at 33/33 ms p95; the largest measured frame across the load tests was
+45.695 ms and the largest capture gap was 5.524 ms. Injected sensor/network
+worker delays reached 259/272 ms. Input/sensor/network/audio stack headroom
+was 1,076/2,376/3,404/2,376 bytes; the weather worker reported 6,452 bytes.
+Four scratch-NVS saves succeeded, with zero timing-test overflows and audio
+errors. The browser suite passed 341 assertions. These checks do not establish
+the SEN66 supply voltage or the ESP32 rail's current headroom.
 
 The weather glance/page implementation passed all 50 cases on the ESP32-S3 clock
 on COM4 in two consecutive final runs (test exit 0; production restoration exit

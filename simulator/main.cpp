@@ -13,6 +13,7 @@
 #include "hg/ui/overlays.h"
 #include "hg/ui/theme.h"
 #include "hg/ui/ui_icon.h"
+#include "hg/ui/weather_screen.h"
 
 #include <emscripten.h>
 #include <lvgl.h>
@@ -140,7 +141,8 @@ EMSCRIPTEN_KEEPALIVE const char *sim_state(void) {
         "\"store\":{\"pending\":%s,\"requested\":%u,\"saved\":%u,\"writes\":%u},"
         "\"input\":{\"encoderDown\":%s,\"touchDown\":%s,\"overflows\":%u,\"expired\":%u},"
         "\"time\":{\"hour\":%d,\"minute\":%d,\"second\":%d},"
-        "\"weather\":{\"offset\":%u,\"glanceLine\":%d,\"showWeather\":%s,\"indoorLevel\":%d},"
+        "\"weather\":{\"offset\":%u,\"glanceLine\":%d,\"showWeather\":%s,\"indoorLevel\":%d,"
+        "\"indoorText\":\"%s\",\"chipsFit\":%s},"
         "\"uiIconWeight\":\"%s\",\"wifi\":{\"rssi\":%d,\"bars\":%d}}",
         now_ms, hg_sim_frames(), hg_navigator_current(), hg_navigator_is_sliding() ? "true" : "false",
         hg_boot_overlay_is_active() ? "true" : "false", hg_display_mode_get(), hg_sim_brightness(),
@@ -154,6 +156,7 @@ EMSCRIPTEN_KEEPALIVE const char *sim_state(void) {
         diag.touch_pressed ? "true" : "false", diag.input_overflows, diag.expired_inputs,
         time.hour_24, time.minute, time.second, view.hourly_offset, glance.line,
         glance.show_weather ? "true" : "false", sensors.indoor.level,
+        hg_weather_screen_sim_indoor_text(), hg_weather_screen_sim_chips_fit() ? "true" : "false",
         HG_UI_ICON_WEIGHT, network.wifi.rssi, network.wifi.bars);
     return json;
 }

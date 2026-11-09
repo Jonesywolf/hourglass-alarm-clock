@@ -304,7 +304,22 @@ static void render_chips(const hg_weather_page_snapshot_t *snap) {
     }
 
     const hg_indoor_snapshot_t *indoor = &snap->indoor;
-    if (indoor->valid && indoor->level != HG_AIR_UNKNOWN) {
+    const char *indoor_status = nullptr;
+    switch (indoor->status) {
+        case HG_SAMPLE_WAITING: indoor_status = "Indoor wait"; break;
+        case HG_SAMPLE_STALE: indoor_status = "Indoor stale"; break;
+        case HG_SAMPLE_PAUSED: indoor_status = "Indoor pause"; break;
+        case HG_SAMPLE_UNAVAILABLE: indoor_status = "Indoor --"; break;
+        case HG_SAMPLE_ERROR: indoor_status = "Indoor error"; break;
+        case HG_SAMPLE_READY: break;
+        default: indoor_status = "Indoor error"; break;
+    }
+    if (!indoor_status && (!indoor->valid || indoor->level == HG_AIR_UNKNOWN)) {
+        indoor_status = "Indoor wait";
+    }
+    if (indoor_status) {
+        set_chip(&indoor_chip, indoor_status, hg_theme_muted());
+    } else {
         if (!isnan(indoor->temp_c)) {
             char temp[16];
             hg_wx_format_temp(temp, sizeof(temp), indoor->temp_c, snap->units);
@@ -312,10 +327,7 @@ static void render_chips(const hg_weather_page_snapshot_t *snap) {
         } else {
             snprintf(text, sizeof(text), "%s", hg_wx_air_level_name(indoor->level));
         }
-        set_chip(&indoor_chip, text, indoor->status == HG_SAMPLE_STALE ? hg_theme_muted() :
-                 hg_wx_air_level_color(indoor->level));
-    } else {
-        set_chip(&indoor_chip, "Indoor --", hg_theme_muted());
+        set_chip(&indoor_chip, text, hg_wx_air_level_color(indoor->level));
     }
 }
 
@@ -343,3 +355,21 @@ void hg_weather_screen_update(const hg_weather_page_snapshot_t *snap) {
     memcpy(&shown_weather, &snap->weather, sizeof(shown_weather));
     memcpy(&shown_view, &snap->view, sizeof(shown_view));
 }
+
+#ifdef HG_SIMULATOR
+const char *hg_weather_screen_sim_indoor_text(void) {
+    return indoor_chip.text ? lv_label_get_text(indoor_chip.text) : "";
+}
+
+bool hg_weather_screen_sim_chips_fit(void) {
+    if (!wind_chip.box || !aqi_chip.box || !indoor_chip.box) {
+        return false;
+    }
+    lv_area_t wind, aqi, indoor;
+    lv_obj_get_coords(wind_chip.box, &wind);
+    lv_obj_get_coords(aqi_chip.box, &aqi);
+    lv_obj_get_coords(indoor_chip.box, &indoor);
+    return wind.x1 >= 0 && wind.x2 < aqi.x1 && aqi.x2 < indoor.x1 &&
+           indoor.x2 < HG_DISP_HOR_RES;
+}
+#endif

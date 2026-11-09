@@ -11,4 +11,9 @@ void hg_weather_screen_create(lv_obj_t *parent);
  * wind / outdoor AQI / indoor air chips. */
 void hg_weather_screen_update(const hg_weather_page_snapshot_t *snap);
 
+#ifdef HG_SIMULATOR
+const char *hg_weather_screen_sim_indoor_text(void);
+bool hg_weather_screen_sim_chips_fit(void);
+#endif
+
 #endif

@@ -59,9 +59,17 @@ void test_alarm_choice_pcm_and_scaling(void);
 void test_alarm_sound_editor_and_presentation(void);
 void test_wifi_signal_boundaries(void);
 void test_ui_icon_assets_and_layers(void);
+void test_sen66_scaling_warmup_and_cadence(void);
+void test_sen66_crc_retry_and_device_faults(void);
+void test_sen66_no_data_and_clock_rollover(void);
+void test_sen66_pause_discards_pending_sample(void);
+void test_indoor_air_retains_and_replaces_samples(void);
+void test_indoor_rating_partial_and_thresholds(void);
+void sen66_test_cleanup(void);
 
 void setUp(void) {}
 void tearDown(void) {
+    sen66_test_cleanup();
     alarm_edit_test_cleanup();
     volume_test_cleanup();
     hg_runtime_test_audio_failure(false, false);
@@ -82,6 +90,12 @@ void setup(void) {
     RUN_TEST(test_alarm_cue_replacement_and_precedence);
     RUN_TEST(test_nonwaiting_time_and_fallback);
     RUN_TEST(test_brightness_keeps_last_good_classification);
+    RUN_TEST(test_sen66_scaling_warmup_and_cadence);
+    RUN_TEST(test_sen66_crc_retry_and_device_faults);
+    RUN_TEST(test_sen66_no_data_and_clock_rollover);
+    RUN_TEST(test_sen66_pause_discards_pending_sample);
+    RUN_TEST(test_indoor_air_retains_and_replaces_samples);
+    RUN_TEST(test_indoor_rating_partial_and_thresholds);
     RUN_TEST(test_timing_percentiles);
     RUN_TEST(test_worker_creation_failure_cleanup);
     RUN_TEST(test_app_startup);

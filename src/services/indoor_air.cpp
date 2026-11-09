@@ -2,25 +2,36 @@
 
 #include "hg/hal/sen66.h"
 #include "hg/services/air_rating.h"
-#include <Arduino.h>
 
 static hg_indoor_snapshot_t snapshot;
-static bool sensor_ready = false;
 
-bool hg_indoor_air_init(void) {
+void hg_indoor_air_init(void) {
     snapshot = {};
-    sensor_ready = hg_sen66_init();
-    snapshot.status = sensor_ready ? HG_SAMPLE_WAITING : HG_SAMPLE_UNAVAILABLE;
-    return sensor_ready;
+    snapshot.status = HG_SAMPLE_WAITING;
+    hg_sen66_init();
 }
 
-void hg_indoor_air_update(void) {
-    hg_sen66_sample_t sample;
-    if (!sensor_ready) {
+void hg_indoor_air_set_paused(bool paused, uint32_t now_ms) {
+    hg_sen66_set_paused(paused, now_ms);
+    snapshot.status = paused ? HG_SAMPLE_PAUSED :
+                      (snapshot.valid ? HG_SAMPLE_STALE : HG_SAMPLE_WAITING);
+}
+
+void hg_indoor_air_update(uint32_t now_ms) {
+    hg_sen66_sample_t sample = {};
+    hg_sample_status_t status = hg_sen66_update(now_ms, &sample);
+    if (status == HG_SAMPLE_WAITING) {
+        if (snapshot.status == HG_SAMPLE_ERROR || snapshot.status == HG_SAMPLE_UNAVAILABLE) {
+            snapshot.status = snapshot.valid ? HG_SAMPLE_STALE : HG_SAMPLE_WAITING;
+        }
         return;
     }
-    if (!hg_sen66_read(&sample) || !sample.valid) {
-        snapshot.status = HG_SAMPLE_ERROR;
+    if (status != HG_SAMPLE_READY) {
+        snapshot.status = status;
+        return;
+    }
+    if (!sample.valid) {
+        snapshot.status = snapshot.valid ? HG_SAMPLE_STALE : HG_SAMPLE_WAITING;
         return;
     }
 
@@ -35,7 +46,7 @@ void hg_indoor_air_update(void) {
     snapshot.voc_index = sample.voc_index;
     snapshot.nox_index = sample.nox_index;
     hg_air_rate_indoor(&snapshot);
-    snapshot.sampled_ms = millis();
+    snapshot.sampled_ms = now_ms;
     snapshot.status = HG_SAMPLE_READY;
 }
 

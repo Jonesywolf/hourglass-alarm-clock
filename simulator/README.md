@@ -97,7 +97,10 @@ samples have no valid readings.
 Scenarios include clock/weather, disabled alarm, boot/sync/fault, unavailable
 and stale readings, weather page variants (`weatherNight`, `weatherRain`,
 `weatherScroll`, `weatherImperial`, `weatherNightlight`, `weatherNoSensor`,
-`fetching`), each clock-face glance line (`glanceStorm`, `glanceSmoke`,
+`fetching`), indoor waiting/stale/paused/error and partial-Poor variants
+(`indoorWaiting`, `indoorStale`, `indoorPaused`, `indoorError`,
+`indoorPartialPoor`, `indoorWaitingNightlight`, `indoorErrorNightlight`),
+each clock-face glance line (`glanceStorm`, `glanceSmoke`,
 `glanceStuffy`, `glanceGusts`, `glanceHeat`, `glanceNight`), the post-alarm
 `briefing` and `briefingOver`, minutes/hours/sound editing, 5/50/55/100% volume, ringing,
 snooze/dismiss confirmations, noon/midnight, night/off and mid-slide. They use
@@ -137,9 +140,11 @@ Available API:
   `indoorStatus`, `indoor` (C), `humidity`, `co2`, `pm25`, `voc`; and `units`
   (0 metric, 1 imperial; only via `reset({environment})`). Omitted keys reset to
   defaults: connected/ready, 100 lux, partly cloudy 18 C, AQI 32 and Good indoor air.
-  Numeric enum values match [types.h](../include/hg/types.h).
+  Set `co2` or `voc` to zero, or `pm25` to `null`, to model a missing rating
+  channel. Numeric enum values match [types.h](../include/hg/types.h).
 - `state().weather`: `offset` (hourly scroll), `glanceLine` (`hg_glance_line_t`),
-  `showWeather`, `indoorLevel` (`hg_air_level_t`).
+  `showWeather`, `indoorLevel` (`hg_air_level_t`), rendered `indoorText`, and
+  `chipsFit` (weather-page chip geometry).
 - `state()`, `capture()`, `pause()`, `play()`, `scenarios`.
 - `state().uiIconWeight` reports the compiled Phosphor weight; `state().wifi`
   reports synthetic RSSI and the four-level production signal classification.

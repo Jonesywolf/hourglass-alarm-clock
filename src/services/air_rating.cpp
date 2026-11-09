@@ -29,19 +29,25 @@ void hg_air_rate_indoor(hg_indoor_snapshot_t *indoor) {
     if (!indoor->valid) {
         return;
     }
-    if (indoor->co2_ppm > 0) {
+    bool have_co2 = indoor->co2_ppm > 0;
+    bool have_pm2_5 = isfinite(indoor->pm2_5) && indoor->pm2_5 >= 0.0f;
+    bool have_voc = indoor->voc_index > 0 && indoor->voc_index <= 500;
+    if (have_co2) {
         consider(indoor, rate(indoor->co2_ppm, HG_INDOOR_CO2_FAIR_PPM, HG_INDOOR_CO2_POOR_PPM),
                  HG_AIR_CAUSE_CO2);
     }
-    if (!isnan(indoor->pm2_5)) {
+    if (have_pm2_5) {
         consider(indoor, rate(indoor->pm2_5, HG_INDOOR_PM25_FAIR, HG_INDOOR_PM25_POOR),
                  HG_AIR_CAUSE_PM2_5);
     }
-    if (indoor->voc_index > 0) {
+    if (have_voc) {
         consider(indoor, rate(indoor->voc_index, HG_INDOOR_VOC_FAIR, HG_INDOOR_VOC_POOR),
                  HG_AIR_CAUSE_VOC);
     }
-    if (indoor->level == HG_AIR_GOOD) {
+    if (indoor->level != HG_AIR_POOR && !(have_co2 && have_pm2_5 && have_voc)) {
+        indoor->level = HG_AIR_UNKNOWN;
+        indoor->cause = HG_AIR_CAUSE_NONE;
+    } else if (indoor->level == HG_AIR_GOOD) {
         indoor->cause = HG_AIR_CAUSE_NONE;
     }
 }

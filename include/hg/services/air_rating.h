@@ -3,8 +3,8 @@
 
 #include "hg/types.h"
 
-/* Pure: sets indoor->level/cause from the worst of CO2, PM2.5 and VOC index (thresholds in config.h).
- * Unknown when the sample is invalid or reports none of those channels. */
+/* Pure: a known Poor channel wins immediately. Good/Fair require CO2, PM2.5 and VOC;
+ * otherwise the level is Unknown. Thresholds are in config.h. */
 void hg_air_rate_indoor(hg_indoor_snapshot_t *indoor);
 
 /* US AQI category 0..5 (Good .. Hazardous). */

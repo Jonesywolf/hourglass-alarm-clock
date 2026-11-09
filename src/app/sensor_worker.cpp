@@ -13,10 +13,11 @@ void hg_sensor_worker_task(void *) {
     bool bus_ready = false;
     bool light_ready = false;
     bool indoor_initialized = false;
-    uint32_t last_retry_ms = millis() - HG_SENSOR_RETRY_MS;
+    bool indoor_policy_applied = false;
+    uint32_t applied_generation = 0;
+    uint32_t last_bus_retry_ms = millis() - HG_SENSOR_RETRY_MS;
+    uint32_t last_light_retry_ms = millis() - HG_SENSOR_RETRY_MS;
     uint32_t last_light_ms = millis() - HG_LIGHT_SAMPLE_MS;
-    uint32_t last_indoor_ms = millis() - HG_INDOOR_SAMPLE_MS;
-    uint32_t last_indoor_error_ms = millis() - HG_SENSOR_RETRY_MS;
     TickType_t last_wake = xTaskGetTickCount();
     for (;;) {
         uint32_t started_us = micros();
@@ -24,12 +25,18 @@ void hg_sensor_worker_task(void *) {
         hg_runtime_inject_load(true);
 #endif
         uint32_t now = millis();
-        if (!light_ready && now - last_retry_ms >= HG_SENSOR_RETRY_MS) {
-            last_retry_ms = now;
+        if (!bus_ready && now - last_bus_retry_ms >= HG_SENSOR_RETRY_MS) {
+            last_bus_retry_ms = now;
+            bus_ready = hg_i2c_init();
             if (!bus_ready) {
-                bus_ready = hg_i2c_init();
+                snapshot.light.status = HG_SAMPLE_ERROR;
+                snapshot.indoor.status = HG_SAMPLE_UNAVAILABLE;
+                HG_ERROR("sensor", "I2C unavailable; retry scheduled\n");
             }
-            light_ready = bus_ready && hg_light_sensor_init();
+        }
+        if (bus_ready && !light_ready && now - last_light_retry_ms >= HG_SENSOR_RETRY_MS) {
+            last_light_retry_ms = now;
+            light_ready = hg_light_sensor_init();
             snapshot.light.status = light_ready ? HG_SAMPLE_WAITING : HG_SAMPLE_ERROR;
             if (!light_ready) {
                 HG_ERROR("sensor", "Ambient light unavailable; retry scheduled\n");
@@ -52,38 +59,53 @@ void hg_sensor_worker_task(void *) {
                 snapshot.light.sampled_ms = millis();
             } else if (snapshot.light.status == HG_SAMPLE_ERROR) {
                 light_ready = false;
-                last_retry_ms = millis();
+                last_light_retry_ms = millis();
                 HG_ERROR("sensor", "Ambient light read failed; last value retained\n");
             }
         }
         hg_runtime_controls_t before = hg_runtime_controls();
-        if (before.indoor_paused) {
-            snapshot.indoor.status = HG_SAMPLE_PAUSED;
-        } else if (indoor_initialized && now - last_indoor_ms >= HG_INDOOR_SAMPLE_MS) {
-            last_indoor_ms = now;
-            hg_indoor_air_update();
+        if (indoor_initialized) {
+            if (!indoor_policy_applied || applied_generation != before.sensor_generation) {
+                hg_indoor_air_set_paused(true, now);
+                if (!before.indoor_paused) {
+                    hg_indoor_air_set_paused(false, now);
+                }
+                applied_generation = before.sensor_generation;
+                indoor_policy_applied = true;
+            }
+            if (!before.indoor_paused) {
+                hg_indoor_air_update(now);
+            }
             hg_indoor_snapshot_t sample;
             hg_indoor_air_get_snapshot(&sample);
             hg_runtime_controls_t after = hg_runtime_controls();
             if (after.sensor_generation == before.sensor_generation) {
                 snapshot.indoor = sample;
             } else {
+                hg_indoor_air_set_paused(true, millis());
+                if (!after.indoor_paused) {
+                    hg_indoor_air_set_paused(false, millis());
+                }
+                applied_generation = after.sensor_generation;
                 snapshot.indoor.status = after.indoor_paused ? HG_SAMPLE_PAUSED :
-                                         HG_SAMPLE_STALE;
+                    (snapshot.indoor.valid ? HG_SAMPLE_STALE : HG_SAMPLE_WAITING);
             }
-            if (sample.status == HG_SAMPLE_ERROR &&
-                millis() - last_indoor_error_ms >= HG_SENSOR_RETRY_MS) {
-                last_indoor_error_ms = millis();
-                HG_ERROR("sensor", "Indoor acquisition failed; last value retained\n");
-            }
+        } else {
+            applied_generation = before.sensor_generation;
+            snapshot.indoor.status = before.indoor_paused ? HG_SAMPLE_PAUSED :
+                                                          HG_SAMPLE_UNAVAILABLE;
         }
         hg_runtime_controls_t current = hg_runtime_controls();
-        snapshot.policy_generation = current.sensor_generation;
-        if (current.indoor_paused) {
-            snapshot.indoor.status = HG_SAMPLE_PAUSED;
-        } else if (snapshot.indoor.status == HG_SAMPLE_PAUSED) {
-            snapshot.indoor.status = snapshot.indoor.valid ? HG_SAMPLE_STALE : HG_SAMPLE_WAITING;
+        if (current.sensor_generation != applied_generation && indoor_initialized) {
+            hg_indoor_air_set_paused(true, millis());
+            if (!current.indoor_paused) {
+                hg_indoor_air_set_paused(false, millis());
+            }
+            applied_generation = current.sensor_generation;
+            snapshot.indoor.status = current.indoor_paused ? HG_SAMPLE_PAUSED :
+                (snapshot.indoor.valid ? HG_SAMPLE_STALE : HG_SAMPLE_WAITING);
         }
+        snapshot.policy_generation = applied_generation;
         snapshot.updated_ms = millis();
         xQueueOverwrite(hg_sensor_mailbox, &snapshot);
         hg_runtime_record_worker(1, micros() - started_us);
